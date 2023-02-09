@@ -14,11 +14,8 @@ public class CityGenerator : MonoBehaviour
     private void Awake()
     {
         CreateGrid();
-
-        for (int i = 0; i < 20; i++) {
-            int j = Random.Range(0, buildings.Count);
-            ModifyBuilding(buildings, j, false, true);
-        }
+        ModifyBuilding(buildings, 10, false, true);
+        SetAdjacents();
     }
 
     public void CreateGrid()
@@ -46,6 +43,35 @@ public class CityGenerator : MonoBehaviour
         GameObject c = Instantiate(planePrefab, new Vector3((size.x / 2)- 10 , (size.y) - 6, (size.z / 2) - 10), Quaternion.identity);
         c.transform.localScale = new Vector3((size.x / 10) , 5, (size.z / 10));
         c.transform.SetParent(transform);
+    }
+
+    public void SetAdjacents()
+    {
+        for (int x = 0; x < size.x; x += 20)
+        {
+            for (int z = 0; z < size.z; z += 20)
+            {
+                Transform building;
+                building = grid[x, z];
+                BuildingBehaviour buildingBehaviour = building.GetComponent<BuildingBehaviour>();
+                if (x - 20 >= 0)
+                {
+                    buildingBehaviour.adjacents.Add(grid[x - 20, z]);
+                }
+                if (x + 20 < size.x)
+                {
+                    buildingBehaviour.adjacents.Add(grid[x + 20, z]);
+                }
+                if (z - 20 >= 0)
+                {
+                    buildingBehaviour.adjacents.Add(grid[x, z - 20]);
+                }
+                if (z + 20 < size.x)
+                {
+                    buildingBehaviour.adjacents.Add(grid[x, z + 20]);
+                }
+            }
+        }
     }
 
     public void ModifyBuilding(List<Transform> buildingsList, int buildingIndex, bool changeLength = true, bool delete = false){
