@@ -7,7 +7,7 @@ public class BuildingBehaviour : MonoBehaviour
     public List<Transform> adjacents;
     public Vector3 position;
     // Start is called before the first frame update
-    void Start()
+    private void Awake()
     {
         
     }
@@ -16,5 +16,12 @@ public class BuildingBehaviour : MonoBehaviour
     void Update()
     {
         
+    }
+
+    void CheckForSpace() {
+        // iterate through adjacents
+
+        // if adjacent[i] is missing
+            // expand into space of adjacent[i]
     }
 }
