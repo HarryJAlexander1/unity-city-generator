@@ -8,11 +8,14 @@ public class GameManager : MonoBehaviour
     public Transform planePrefab;
     public Transform plane;
 
+    public Transform roadGeneratorPrefab;
+
     // Start is called before the first frame update
     void Start()
     {
-        CreatePlane(new(45, 0, 213), new(25, 1, 15));
-        CreateCity();
+        CreateRoadGenerator(new(0, 0, 0));
+        //CreatePlane(new(45, 0, 213), new(25, 1, 15));
+        //CreateCity();
     }
 
     void CreateCity() {
@@ -24,5 +27,9 @@ public class GameManager : MonoBehaviour
     void CreatePlane(Vector3 pos, Vector3 dim) {
         plane = Instantiate(planePrefab, pos, Quaternion.identity);
         plane.localScale = dim;
+    }
+
+    void CreateRoadGenerator(Vector3 pos) {
+        var roadGenerator = Instantiate(roadGeneratorPrefab, pos, Quaternion.identity);
     }
 }
