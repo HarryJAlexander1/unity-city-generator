@@ -9,15 +9,19 @@ public class RoadGenLindenmayer : MonoBehaviour
     public int maxIterations;
     public int length;
 
+    private bool isExecuting = false;
+
+    List<string> commandSequence = new();
+
     private void Awake()
     {
-        GenerateSentence();
+       string s = GenerateSentence();
+       LoadCommands(s);
     }
 
-    // Update is called once per frame
-    void Update()
+    private void FixedUpdate()
     {
-        
+        StartExecution();
     }
 
     string GenerateSentence() {
@@ -47,13 +51,65 @@ public class RoadGenLindenmayer : MonoBehaviour
             sentence = nextResult;
             iterations++;
         }
-        Debug.Log(sentence);
-        return sentence;
+        //Debug.Log(sentence);
+        return sentence; 
     }
 
-    void GenerateRoads(List<string> sentence) {
+    void LoadCommands(string sentence) {
 
         // Actions
-        Dictionary<string, string> actions = new() { ["F"] = "Forwards", ["-"] = "Left", ["+"] = "Right", ["["] = "Save", ["]"] = "Load" };
+        Dictionary<char, string> actions = new() { ['F'] = "forwards", ['-'] = "left", ['+'] = "right", ['['] = "save", [']'] = "load" };
+        
+        foreach (char c in sentence)
+        {
+            commandSequence.Add(actions[c]);
+        }
+
+        /*  foreach (var x in commandSequence)
+          {
+              Debug.Log(x.ToString());
+          }*/
+
+        Debug.Log(commandSequence.Count);
+
+    }
+
+    // Coroutine to execute commands one by one
+    IEnumerator ExecuteCommands()
+    {
+        isExecuting = true;
+        foreach (string command in commandSequence)
+        {
+            switch (command)
+            {
+                case "forwards":
+                    transform.Translate(Vector3.forward * length);
+                    break;
+                case "backwards":
+                    transform.Translate(-Vector3.forward * length);
+                    break;
+                case "left":
+                    transform.Rotate(Vector3.up, -angle);
+                    break;
+                case "right":
+                    transform.Rotate(Vector3.up, angle);
+                    break;
+                default:
+                    Debug.Log("Unknown command: " + command);
+                    break;
+            }
+            yield return new WaitForSeconds(1.0f);  // wait for 1 second before executing the next command
+        }
+        commandSequence.Clear();
+        isExecuting = false;
+    }
+
+    // Start executing commands
+    public void StartExecution()
+    {
+        if (!isExecuting && commandSequence.Count > 0)
+        {
+            StartCoroutine(ExecuteCommands());
+        }
     }
 }
