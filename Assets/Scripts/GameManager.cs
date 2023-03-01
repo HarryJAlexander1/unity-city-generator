@@ -8,7 +8,8 @@ public class GameManager : MonoBehaviour
     public Transform planePrefab;
     public Transform plane;
 
-    public Transform roadGeneratorPrefab;
+    public GameObject roadGeneratorPrefab;
+    public GameObject roadGenerator;
 
     // Start is called before the first frame update
     void Start()
@@ -30,6 +31,6 @@ public class GameManager : MonoBehaviour
     }
 
     void CreateRoadGenerator(Vector3 pos) {
-        var roadGenerator = Instantiate(roadGeneratorPrefab, pos, Quaternion.identity);
+       roadGenerator = Instantiate(roadGeneratorPrefab, pos, Quaternion.identity);
     }
 }
