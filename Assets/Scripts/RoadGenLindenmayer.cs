@@ -9,11 +9,14 @@ public class RoadGenLindenmayer : MonoBehaviour
     public int maxIterations;
     public int length;
 
-    private bool isExecuting = false;
+    public bool isExecuting = false;
 
     List<string> commandSequence = new();
 
     public GameObject segmentPrefab;
+    public GameObject blockPrefab;
+
+    private GameObject RoadNetwork;
 
     private void Awake()
     {
@@ -79,31 +82,52 @@ public class RoadGenLindenmayer : MonoBehaviour
     // Coroutine to execute commands one by one
     IEnumerator ExecuteCommands()
     {
+        List<Vector3> prevPositions = new();
         // save original state
         Vector3 position = transform.position;
         Quaternion rotation = transform.localRotation;
 
+        RoadNetwork = new GameObject("Road Network");
+        RoadNetwork.tag = "Road Network";
+
         isExecuting = true;
         foreach (string command in commandSequence)
         {
+            
             switch (command)
             {
                 case "forwards":
                     Vector3 prevPos = transform.position;
                     transform.Translate(Vector3.forward * length);
                     Vector3 newPos = transform.position;
-                    Vector3 segmentPos = (newPos + prevPos) * 0.5f;
-                    SpawnSegment(segmentPos, transform.localRotation);
-                    break;
-                case "backwards":
-                    transform.Translate(-Vector3.forward * length);
-                    SpawnSegment(transform.position, transform.localRotation);
+                    Vector3 x = ((newPos + prevPos) * 0.5f);
+                    // if list of previous positions doesn't contain new position, add it to list and spawn new segment
+                    if (!prevPositions.Contains(x)) {
+                        prevPositions.Add(x);
+                        GameObject s = SpawnSegment(x, transform.localRotation);
+
+                        ////////////////////////////////////////////////////////
+                        Vector3 rightDirection = s.transform.right;
+                        Vector3 y = new(s.transform.position.x, s.transform.position.y + 1, s.transform.position.z);
+                        Vector3 spawnPosition = y + (rightDirection * (length * 0.5f));
+                        if (!prevPositions.Contains(spawnPosition)) {
+                            SpawnBlock(spawnPosition);
+                            prevPositions.Add(spawnPosition);
+                            Vector3 leftDirection = -s.transform.right;
+                            spawnPosition = s.transform.position + (leftDirection * (length * 0.5f));
+                            SpawnBlock(spawnPosition);
+                            prevPositions.Add(spawnPosition);
+                        }
+                    }
+               
                     break;
                 case "left":
                     transform.Rotate(Vector3.up, -angle);
+        
                     break;
                 case "right":
                     transform.Rotate(Vector3.up, angle);
+             
                     break;
                 case "save":
                     // save state
@@ -119,9 +143,10 @@ public class RoadGenLindenmayer : MonoBehaviour
                     //Debug.Log("Unknown command: " + command);
                     break;
             }
-            yield return new WaitForSeconds(0.1f);  // wait for 1 second before executing the next command
+            yield return new WaitForSeconds(0.00001f);  // wait for 1 second before executing the next command
         }
         commandSequence.Clear();
+        
         isExecuting = false;
     }
 
@@ -134,11 +159,20 @@ public class RoadGenLindenmayer : MonoBehaviour
         }
     }
 
-   public void SpawnSegment(Vector3 pos, Quaternion rot) {
+   public GameObject SpawnSegment(Vector3 pos, Quaternion rot) {
         // spawn road segment at position
         GameObject segment = Instantiate(segmentPrefab, new(pos.x, pos.y, pos.z), Quaternion.identity);
         // adjust shape of segment
         segment.transform.localScale = new Vector3(segment.transform.localScale.x, segment.transform.localScale.y, length);
         segment.transform.localRotation = rot;
+        segment.transform.parent = RoadNetwork.transform;
+        return segment;
     }
+
+    public GameObject SpawnBlock(Vector3 pos) {
+        GameObject cityBlock = Instantiate(blockPrefab, pos, Quaternion.identity);
+        cityBlock.transform.localScale = cityBlock.transform.localScale * ((length * 0.1f)* 0.8f);
+        return cityBlock;
+    }
+
 }
