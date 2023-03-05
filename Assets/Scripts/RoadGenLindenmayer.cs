@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+
 public class RoadGenLindenmayer : MonoBehaviour
 {
     public int angle;
@@ -56,7 +57,7 @@ public class RoadGenLindenmayer : MonoBehaviour
             sentence = nextResult;
             iterations++;
         }
-        Debug.Log(sentence);
+        //Debug.Log(sentence);
         return sentence; 
     }
 
@@ -75,14 +76,15 @@ public class RoadGenLindenmayer : MonoBehaviour
               Debug.Log(x.ToString());
           }*/
 
-        Debug.Log(commandSequence.Count);
+        //Debug.Log(commandSequence.Count);
 
     }
 
     // Coroutine to execute commands one by one
     IEnumerator ExecuteCommands()
     {
-        List<Vector3> prevPositions = new();
+        List<Vector3> allSegmentPositions = new();
+        List<Vector3> allBlockPositions = new();
         // save original state
         Vector3 position = transform.position;
         Quaternion rotation = transform.localRotation;
@@ -97,26 +99,42 @@ public class RoadGenLindenmayer : MonoBehaviour
             switch (command)
             {
                 case "forwards":
+                    // assign current position
                     Vector3 prevPos = transform.position;
+                    // generator moves forward
                     transform.Translate(Vector3.forward * length);
+                    // assign new position
                     Vector3 newPos = transform.position;
-                    Vector3 x = ((newPos + prevPos) * 0.5f);
-                    // if list of previous positions doesn't contain new position, add it to list and spawn new segment
-                    if (!prevPositions.Contains(x)) {
-                        prevPositions.Add(x);
-                        GameObject s = SpawnSegment(x, transform.localRotation);
+                    // assign segment spawn position
+                    Vector3 segmentSpawnPosition = ((newPos + prevPos) * 0.5f);
+                    // if segment position is new...
+                    if (!IsApproximatelyInList(segmentSpawnPosition,1f,allSegmentPositions)) {
+                        // add segment position to the list
+                        allSegmentPositions.Add(segmentSpawnPosition);
+                        // spawn the segment at the position
+                        GameObject segment = SpawnSegment(segmentSpawnPosition, transform.localRotation);
 
-                        ////////////////////////////////////////////////////////
-                        Vector3 rightDirection = s.transform.right;
-                        Vector3 y = new(s.transform.position.x, s.transform.position.y + 1, s.transform.position.z);
-                        Vector3 spawnPosition = y + (rightDirection * (length * 0.5f));
-                        if (!prevPositions.Contains(spawnPosition)) {
-                            SpawnBlock(spawnPosition);
-                            prevPositions.Add(spawnPosition);
-                            Vector3 leftDirection = -s.transform.right;
-                            spawnPosition = s.transform.position + (leftDirection * (length * 0.5f));
-                            SpawnBlock(spawnPosition);
-                            prevPositions.Add(spawnPosition);
+
+                        // assign city block spawn location for right side of segment
+                        Vector3 blockSpawnPosition = segmentSpawnPosition + (segment.transform.right * (length * 0.5f));
+                        if (!IsApproximatelyInList(blockSpawnPosition, 1f, allBlockPositions)) {
+                            // spawn city block at location
+                            GameObject b = SpawnBlock(blockSpawnPosition);
+                            // assign cityblock rotation to equal segment rotation
+                            b.transform.rotation = segment.transform.rotation;
+                            // add block spawn position to list
+                            allBlockPositions.Add(blockSpawnPosition);
+                            
+                        }
+                        // assign city block spawn location for left side of segment
+                        blockSpawnPosition = segment.transform.position + (-segment.transform.right * (length * 0.5f));
+                        if (!IsApproximatelyInList(blockSpawnPosition, 1f, allBlockPositions)) {
+                            // spawn city block at location
+                            GameObject b = SpawnBlock(blockSpawnPosition);
+                            // assign cityblock rotation to equal segment rotation
+                            b.transform.rotation = segment.transform.rotation;
+                            // add block spawn position to list
+                            allBlockPositions.Add(blockSpawnPosition);
                         }
                     }
                
@@ -143,7 +161,7 @@ public class RoadGenLindenmayer : MonoBehaviour
                     //Debug.Log("Unknown command: " + command);
                     break;
             }
-            yield return new WaitForSeconds(0.00001f);  // wait for 1 second before executing the next command
+            yield return new WaitForSeconds(0.25f);  // wait for 1 second before executing the next command
         }
         commandSequence.Clear();
         
@@ -175,4 +193,17 @@ public class RoadGenLindenmayer : MonoBehaviour
         return cityBlock;
     }
 
+    public bool IsApproximatelyInList(Vector3 targetPosition, float threshold, List<Vector3> vectorList)
+    {
+        foreach (Vector3 vector in vectorList)
+        {
+            if (Vector3.Distance(targetPosition, vector) < threshold)
+            {
+                return true;
+            }
+           // Debug.Log("Distance: " + Vector3.Distance(targetPosition, vector));
+        }
+        return false;
+    }
 }
+
