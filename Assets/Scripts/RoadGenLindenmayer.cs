@@ -15,7 +15,7 @@ public class RoadGenLindenmayer : MonoBehaviour
     List<string> commandSequence = new();
 
     public GameObject segmentPrefab;
-    public GameObject blockPrefab;
+    public List<GameObject> blockPrefabs;
 
     private GameObject RoadNetwork;
 
@@ -70,14 +70,6 @@ public class RoadGenLindenmayer : MonoBehaviour
         {
             commandSequence.Add(actions[c]);
         }
-
-        /*  foreach (var x in commandSequence)
-          {
-              Debug.Log(x.ToString());
-          }*/
-
-        //Debug.Log(commandSequence.Count);
-
     }
 
     // Coroutine to execute commands one by one
@@ -161,7 +153,7 @@ public class RoadGenLindenmayer : MonoBehaviour
                     //Debug.Log("Unknown command: " + command);
                     break;
             }
-            yield return new WaitForSeconds(0.25f);  // wait for 1 second before executing the next command
+            yield return new WaitForSeconds(0.01f);  // wait for 1 second before executing the next command
         }
         commandSequence.Clear();
         
@@ -188,7 +180,10 @@ public class RoadGenLindenmayer : MonoBehaviour
     }
 
     public GameObject SpawnBlock(Vector3 pos) {
-        GameObject cityBlock = Instantiate(blockPrefab, pos, Quaternion.identity);
+        // random int i 
+        int i = Random.Range(0, blockPrefabs.Count);
+        // select i from list of blocks
+        GameObject cityBlock = Instantiate(blockPrefabs[i], pos, Quaternion.identity);
         cityBlock.transform.localScale = cityBlock.transform.localScale * ((length * 0.1f)* 0.8f);
         return cityBlock;
     }
