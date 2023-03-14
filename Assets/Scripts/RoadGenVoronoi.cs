@@ -7,6 +7,8 @@ public class RoadGenVoronoi : MonoBehaviour
 {
 
     List<Triangle> triangles;
+    List<Edge> voronoiEdges;
+    Dictionary<Triangle, List<Triangle>> trianglesAndNeighbours;
 
     private class Vertex {
 
@@ -77,17 +79,34 @@ public class RoadGenVoronoi : MonoBehaviour
         private Vertex _vertexB;
         private Vertex _vertexC;
 
-        private Vector3 _circumcenter;
+        private Edge _edgeAB;
+        private Edge _edgeBC;
+        private Edge _edgeCA;
+
+        private List<Edge> _edges = new();
+
+        private Vertex _circumcenter;
         private float _circumradius;
 
-        public Triangle(Vertex vertexA, Vertex vertexB, Vertex vertexC) {
+        private List<Triangle> _neighbours = new List<Triangle>();
+
+        public Triangle(Vertex vertexA, Vertex vertexB, Vertex vertexC, Edge edgeAB, Edge edgeBC, Edge edgeCA) {
             _vertexA = vertexA;
             _vertexB = vertexB;
             _vertexC = vertexC;
 
+            _edgeAB = edgeAB;
+            _edgeBC = edgeBC;
+            _edgeCA = edgeCA;
+
+            _edges.Add(edgeAB);
+            _edges.Add(edgeBC);
+            _edges.Add(edgeCA);
+
             Vector2 circumcenterVector2 = GetCircumcenter(this);
-            _circumcenter = new(circumcenterVector2.x, 0, circumcenterVector2.y);
+            _circumcenter = new(new((int)circumcenterVector2.x, 0, (int)circumcenterVector2.y), 1);
             _circumradius = Vector2.Distance(circumcenterVector2, new(VertexA.Position.x, VertexA.Position.z));
+
 
         }
 
@@ -110,7 +129,35 @@ public class RoadGenVoronoi : MonoBehaviour
             set { _vertexC = value; }
         }
 
-        public Vector3 Circumcenter
+        public Edge EdgeAB
+        {
+
+            get { return _edgeAB; }
+            set { _edgeAB = value; }
+        }
+
+        public Edge EdgeBC
+        {
+
+            get { return _edgeBC; }
+            set { _edgeBC = value; }
+        }
+
+        public Edge EdgeCA
+        {
+
+            get { return _edgeCA; }
+            set { _edgeCA = value; }
+        }
+
+        public List<Edge> Edges
+        {
+
+            get { return _edges; }
+            set { _edges = value; }
+        }
+
+        public Vertex Circumcenter
         {
 
             get { return _circumcenter; }
@@ -121,6 +168,30 @@ public class RoadGenVoronoi : MonoBehaviour
 
             get { return _circumradius; }
             set { _circumradius = value; }
+        }
+
+        public List<Triangle> Neighbours
+        {
+            get { return _neighbours; }
+            set { _neighbours = value; }
+        }
+       
+        public bool SharesEdge(Triangle other)
+        {
+            int sharedVertices = 0;
+            if (_vertexA == other._vertexA || _vertexA == other._vertexB || _vertexA == other._vertexC)
+            {
+                sharedVertices++;
+            }
+            if (_vertexB == other._vertexA || _vertexB == other._vertexB || _vertexB == other._vertexC)
+            {
+                sharedVertices++;
+            }
+            if (_vertexC == other._vertexA || _vertexC == other._vertexB || _vertexC == other._vertexC)
+            {
+                sharedVertices++;
+            }
+            return sharedVertices == 2;
         }
     }
   //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -157,11 +228,11 @@ public class RoadGenVoronoi : MonoBehaviour
         Vertex v2 = new Vertex(new(minX - dX, 0, maxZ + dZ), 2);
         Vertex v3 = new Vertex(new(maxX + dX * 3, 0, maxZ + dZ), 3);
 
-        //Edge e1 = new Edge(v1, v3);
-        //Edge e2 = new Edge(v2, v3);
-        //Edge e3 = new Edge(v1, v2);
+        Edge e1 = new Edge(v1, v2);
+        Edge e2 = new Edge(v2, v3);
+        Edge e3 = new Edge(v3, v1);
 
-        Triangle superTriangle = new Triangle(v1, v2, v3);
+        Triangle superTriangle = new Triangle(v1, v2, v3, e1, e2, e3);
 
         //Debug.Log("Edge A: Vertex A "+ superTriangle.VertexA.Position);
         //Debug.Log("Edge A: Vertex B " + superTriangle.VertexB.Position);
@@ -247,7 +318,7 @@ public class RoadGenVoronoi : MonoBehaviour
 
     private bool IsPointInCircumcircle(Vertex point, Triangle triangle) {
 
-        Vector3 circumcenter = triangle.Circumcenter;
+        Vector3 circumcenter = triangle.Circumcenter.Position;
         float circumradius = triangle.Circumradius;
 
         float R = Mathf.Sqrt(Mathf.Pow(circumcenter.x - point.Position.x, 2) + Mathf.Pow(circumcenter.z - point.Position.z, 2));
@@ -300,7 +371,11 @@ public class RoadGenVoronoi : MonoBehaviour
         
             // Create new triangles from the edges and current point and add to list
             for (int x = 0; x < edges.Count; x++) {
-                triangles.Add(new Triangle(edges[x].VertexA, edges[x].VertexB, pointList[n]));
+                Edge ab = new(edges[x].VertexA, edges[x].VertexB);
+                Edge bc = new(edges[x].VertexB, pointList[n]);
+                Edge ca = new(pointList[n], edges[x].VertexA);
+
+                triangles.Add(new Triangle(edges[x].VertexA, edges[x].VertexB, pointList[n], ab, bc, ca));
             }
 
         }
@@ -313,41 +388,178 @@ public class RoadGenVoronoi : MonoBehaviour
         return triangles;
     }
 
+    private Dictionary<Triangle, List<Triangle>> CalculateNeighbors(List<Triangle> triangles)
+    {
+        Dictionary<Triangle, List<Triangle>> neighbors = new Dictionary<Triangle, List<Triangle>>();
+        foreach (Triangle t in triangles)
+        {
+            neighbors[t] = new List<Triangle>();
+        }
+        foreach (Triangle t in triangles)
+        {
+            foreach (Triangle u in triangles)
+            {
+                if (t != u && t.SharesEdge(u))
+                {
+                    neighbors[t].Add(u);
+                }
+            }
+        }
+        return neighbors;
+    }
+
     private void OnDrawGizmos()
     {
         if (triangles == null)
             return;
 
-        Gizmos.color = Color.white;
+        List<Color> colours = new();
+        colours.Add(Color.white);
+        colours.Add(Color.black);
+        colours.Add(Color.gray);
+        colours.Add(Color.red);
+        colours.Add(Color.cyan);
+        colours.Add(Color.green);
+        colours.Add(Color.magenta);
+        colours.Add(Color.yellow);
+        colours.Add(Color.blue);
+        colours.Add(Color.white);
+        colours.Add(Color.black);
+        colours.Add(Color.gray);
+        colours.Add(Color.red);
+        colours.Add(Color.cyan);
 
-        foreach (Triangle triangle in triangles)
+        Gizmos.color = Color.white;
+        for (int i = 0; i < triangles.Count; i++)
         {
-            Gizmos.DrawLine(triangle.VertexA.Position, triangle.VertexB.Position);
-            Gizmos.DrawLine(triangle.VertexB.Position, triangle.VertexC.Position);
-            Gizmos.DrawLine(triangle.VertexC.Position, triangle.VertexA.Position);
+            //Gizmos.color = colours[i];
+            Gizmos.DrawLine(triangles[i].VertexA.Position, triangles[i].VertexB.Position);
+            Gizmos.DrawLine(triangles[i].VertexB.Position, triangles[i].VertexC.Position);
+            Gizmos.DrawLine(triangles[i].VertexC.Position, triangles[i].VertexA.Position);
+
+            //Gizmos.DrawSphere(triangles[i].Circumcenter.Position, 3f);
         }
+
+        Gizmos.color = Color.black;
+        foreach (Edge edge in voronoiEdges)
+        {
+            Gizmos.color = Color.blue;
+            //Gizmos.DrawSphere(edge.VertexA.Position, 3f);
+            //Gizmos.DrawSphere(edge.VertexB.Position, 3f);
+            Gizmos.DrawLine(edge.VertexA.Position, edge.VertexB.Position);
+        }
+
+        Vertex v1 = new Vertex(new(200, 0, 1), 1);
+        Vertex v2 = new Vertex(new(100, 0, 150), 2);
+        Vertex v3 = new Vertex(new(300, 0, 75), 3);
+        Vertex v4 = new Vertex(new(50, 0, 50), 4);
+        Vertex v5 = new Vertex(new(100, 0, 100), 5);
+        Vertex v6 = new Vertex(new(175, 0, 20), 6);
+        Vertex v7 = new Vertex(new(180, 0, 180), 7);
+        Vertex v8 = new Vertex(new(201, 0, 89), 8);
+        Vertex v9 = new Vertex(new(65, 0, 173), 8);
+        Vertex v10 = new Vertex(new(334, 0, 98), 8);
+        Vertex v11 = new Vertex(new(-100, 0, 152), 8);
+        Vertex v12 = new Vertex(new(250, 0, 500), 8);
+        Vertex v13 = new Vertex(new(-100, 0, -200), 8);
+        Vertex v14 = new Vertex(new(16, 0, 31), 8);
+        Vertex v15 = new Vertex(new(169, 0, 475), 8);
+        Vertex v16 = new Vertex(new(300, 0, -200), 8);
+
+        List<Vertex> testPoints = new();
+        //testPoints.Add(v1);
+        testPoints.Add(v2);
+        testPoints.Add(v3);
+        testPoints.Add(v4);
+        testPoints.Add(v5);
+        testPoints.Add(v6);
+        testPoints.Add(v7);
+        testPoints.Add(v8);
+        testPoints.Add(v9);
+        testPoints.Add(v10);
+        testPoints.Add(v11);
+        testPoints.Add(v12);
+        testPoints.Add(v13);
+        testPoints.Add(v14);
+        testPoints.Add(v15);
+        testPoints.Add(v16);
+        Gizmos.color = Color.red;
+        foreach (Vertex point in testPoints)
+        {
+            Gizmos.DrawSphere(point.Position, 3);
+        }
+    }
+
+    private List<Edge> CreateVoronoiDiagram(Dictionary<Triangle, List<Triangle>> trianglesAndNeighbours) {
+        // initiate midpoint list;
+        //List<Vertex> circumcenterPoints = new();
+        List<Edge> voronoiEdges = new();
+
+        foreach (KeyValuePair<Triangle, List<Triangle>> entry in trianglesAndNeighbours)
+        {
+            // iterate through the list of strings associated to the key
+            foreach (Triangle value in entry.Value)
+            {
+                // Create edges between each triangle's circumcenter and its neighbour's circumcenter
+                Edge voronoiEdge = new(entry.Key.Circumcenter, value.Circumcenter);
+                voronoiEdges.Add(voronoiEdge);
+            }
+        }
+        //---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+      /*  // iterate through each triangle and create edge from each circumcenter to neighbour
+
+        for (int i = 0; i < triangles.Count; i++)
+        {
+            // get circumcenter of two neighbouring triangles and create new Vertex objects
+            Vertex circumcenterVertex = new(new((int)triangles[i].Circumcenter.x, (int)triangles[i].Circumcenter.y, (int)triangles[i].Circumcenter.z), 1);
+            circumcenterPoints.Add(circumcenterVertex);
+        }
+        for (int j = 0; j < circumcenterPoints.Count; j++) {
+
+            float minDistance = float.MaxValue;
+            Vertex nearestNeighbour = new(Vector3Int.zero, 1);
+
+            for (int k = j; k < circumcenterPoints.Count; k++) {
+                // find nearest neighbour
+                if (j == k) continue;
+
+                float distance = Vector3.Distance(circumcenterPoints[j].Position, circumcenterPoints[k].Position);
+
+                if (distance < minDistance)
+                {
+                    minDistance = distance;
+                    nearestNeighbour = circumcenterPoints[k];
+                }
+            }
+            Edge voronoiEdge = new(circumcenterPoints[j], nearestNeighbour);
+            voronoiEdges.Add(voronoiEdge);
+        }*/
+        
+        return voronoiEdges;
     }
 
 private void Awake()
     {
-        Vertex v1 = new Vertex(new(130, 0, 320), 1);
-        Vertex v2 = new Vertex(new(50, 0, 150), 2);
-        Vertex v3 = new Vertex(new(110, 0, 210), 3);
-        Vertex v4 = new Vertex(new(290, 0, 80), 4);
-        Vertex v5 = new Vertex(new(300, 0, 668), 5);
-        Vertex v6 = new Vertex(new(87, 0, 23), 6);
-        Vertex v7 = new Vertex(new(279, 0, 51), 7);
+        Vertex v1 = new Vertex(new(200, 0, 1), 1);
+        Vertex v2 = new Vertex(new(100, 0, 150), 2);
+        Vertex v3 = new Vertex(new(300, 0, 75), 3);
+        Vertex v4 = new Vertex(new(50, 0, 50), 4);
+        Vertex v5 = new Vertex(new(100, 0, 100), 5);
+        Vertex v6 = new Vertex(new(175, 0, 20), 6);
+        Vertex v7 = new Vertex(new(180, 0, 180), 7);
         Vertex v8 = new Vertex(new(201, 0, 89), 8);
         Vertex v9 = new Vertex(new(65, 0, 173), 8);
-        Vertex v10 = new Vertex(new(334, 0, 41), 8);
-        Vertex v11 = new Vertex(new(96, 0, 152), 8);
-        Vertex v12 = new Vertex(new(562, 0, 341), 8);
-        Vertex v13 = new Vertex(new(222, 0, 370), 8);
+        Vertex v10 = new Vertex(new(334, 0, 98), 8);
+        Vertex v11 = new Vertex(new(-100, 0, 152), 8);
+        Vertex v12 = new Vertex(new(250, 0, 500), 8);
+        Vertex v13 = new Vertex(new(-100, 0, -200), 8);
         Vertex v14 = new Vertex(new(16, 0, 31), 8);
         Vertex v15 = new Vertex(new(169, 0, 475), 8);
+        Vertex v16 = new Vertex(new(300, 0, -200), 8);
 
         List<Vertex> points = new();
-        points.Add(v1);
+        //points.Add(v1);
         points.Add(v2);
         points.Add(v3);
         points.Add(v4);
@@ -362,6 +574,7 @@ private void Awake()
         points.Add(v13);
         points.Add(v14);
         points.Add(v15);
+        points.Add(v16);
 
         //Edge e1 = new Edge(v1, v3);
         //Edge e2 = new Edge(v2, v3);
@@ -376,8 +589,11 @@ private void Awake()
         //Debug.Log("Circumradius of triangle: " + testTriangle.Circumradius);
 
         triangles = Triangulate(points);
-        foreach (Triangle t in triangles) {
+        trianglesAndNeighbours = CalculateNeighbors(triangles);
+        //Debug.Log(trianglesAndNeighbours.ElementAt(0));
+        voronoiEdges = CreateVoronoiDiagram(trianglesAndNeighbours);
+        /*foreach (Triangle t in triangles) {
             Debug.Log("Triangle vertices: " + t.VertexA.Position + t.VertexB.Position + t.VertexC.Position);
-        }
+        }*/
     }
 }
