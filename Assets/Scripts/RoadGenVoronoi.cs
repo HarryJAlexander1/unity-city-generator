@@ -9,10 +9,11 @@ public class RoadGenVoronoi : MonoBehaviour
     Dictionary<Triangle, List<Triangle>> trianglesAndNeighbours;
     List<Edge> voronoiEdges;
 
+    public GameObject segmentPrefab;
+
     private class Vertex {
 
         private Vector3Int _position;
-
         public Vertex(Vector3Int position)
         {
             _position = position;
@@ -57,7 +58,6 @@ public class RoadGenVoronoi : MonoBehaviour
             get { return _length;}
             set { _length = value; }
         }
-
     }
 
     private class Triangle {
@@ -78,37 +78,32 @@ public class RoadGenVoronoi : MonoBehaviour
             Vector2 circumcenterVector2 = GetCircumcenter(this);
             _circumcenter = new(new((int)circumcenterVector2.x, 0, (int)circumcenterVector2.y));
             _circumradius = Vector2.Distance(circumcenterVector2, new(VertexA.Position.x, VertexA.Position.z));
-
         }
 
         // getter and setters
-        public Vertex VertexA {
-
+        public Vertex VertexA 
+        {
             get { return _vertexA; }
             set { _vertexA = value; }
         }
         public Vertex VertexB
         {
-
             get { return _vertexB; }
             set { _vertexB = value; }
         }
         public Vertex VertexC
         {
-
             get { return _vertexC; }
             set { _vertexC = value; }
         }
 
         public Vertex Circumcenter
         {
-
             get { return _circumcenter; }
             set { _circumcenter = value; }
         }
         public float Circumradius
         {
-
             get { return _circumradius; }
             set { _circumradius = value; }
         }
@@ -306,6 +301,7 @@ public class RoadGenVoronoi : MonoBehaviour
     private Dictionary<Triangle, List<Triangle>> CalculateNeighbors(List<Triangle> triangles)
     {
         Dictionary<Triangle, List<Triangle>> neighbors = new Dictionary<Triangle, List<Triangle>>();
+
         foreach (Triangle t in triangles)
         {
             neighbors[t] = new List<Triangle>();
@@ -325,7 +321,6 @@ public class RoadGenVoronoi : MonoBehaviour
 
     private List<Edge> CreateVoronoiDiagram(Dictionary<Triangle, List<Triangle>> trianglesAndNeighbours)
     {
-
         List<Edge> voronoiEdges = new();
 
         foreach (KeyValuePair<Triangle, List<Triangle>> entry in trianglesAndNeighbours)
@@ -341,7 +336,38 @@ public class RoadGenVoronoi : MonoBehaviour
         return voronoiEdges;
     }
 
-    private void OnDrawGizmos()
+    private void SpawnRoads(List<Edge> edges) {
+
+        List<Vector3> midpoints = new();
+        bool duplicatePosition;
+
+        foreach (Edge edge in edges) {
+            duplicatePosition = false;
+            // Calculate the midpoint and set the position
+            Vector3 midpoint = (edge.VertexA.Position + edge.VertexB.Position) / 2;
+
+            // iterate through list of previous midpoints to prevent duplicate road segments
+            for (int i = 0; i < midpoints.Count; i++) {
+                if (midpoint == midpoints[i]) { duplicatePosition = true; }
+            }
+
+            if (!duplicatePosition) {
+
+                // Calculate the rotation based on the direction of the edge
+                Vector3 direction = ((Vector3)edge.VertexB.Position - (Vector3)edge.VertexA.Position).normalized;
+                Quaternion rotation = Quaternion.LookRotation(direction);
+
+                // Instantiate a new road prefab
+                GameObject road = Instantiate(segmentPrefab, midpoint, rotation);
+                midpoints.Add(midpoint);
+
+                // Set the length
+                road.transform.localScale = new(road.transform.localScale.x * 5, road.transform.localScale.y, (road.transform.localScale.z * (float)edge.Length));
+            }  
+        }
+    }
+
+  /*  private void OnDrawGizmos()
     {
         if (triangles == null)
             return;
@@ -407,27 +433,27 @@ public class RoadGenVoronoi : MonoBehaviour
         {
             Gizmos.DrawSphere(point.Position, 3);
         }
-    }
+    }*/
 
 private void Awake()
     {
-        Vertex v1 = new Vertex(new(200, 0, 1));
-        Vertex v2 = new Vertex(new(100, 0, 150));
-        Vertex v3 = new Vertex(new(300, 0, 75));
-        Vertex v4 = new Vertex(new(50, 0, 50));
-        Vertex v5 = new Vertex(new(100, 0, 100));
-        Vertex v6 = new Vertex(new(175, 0, 20));
-        Vertex v7 = new Vertex(new(180, 0, 180));
-        Vertex v8 = new Vertex(new(201, 0, 89));
-        Vertex v9 = new Vertex(new(65, 0, 173));
-        Vertex v10 = new Vertex(new(334, 0, 98));
-        Vertex v11 = new Vertex(new(-100, 0, 152));
-        Vertex v12 = new Vertex(new(250, 0, 500));
-        Vertex v13 = new Vertex(new(-100, 0, -200));
-        Vertex v14 = new Vertex(new(16, 0, 31));
-        Vertex v15 = new Vertex(new(169, 0, 475));
-        Vertex v16 = new Vertex(new(300, 0, -200));
-        Vertex v17 = new Vertex(new(120, 0, -234));
+        Vertex v1 = new Vertex(new(2000, 0, 10));
+        Vertex v2 = new Vertex(new(1000, 0, 1500));
+        Vertex v3 = new Vertex(new(3000, 0, 750));
+        Vertex v4 = new Vertex(new(500, 0, 500));
+        Vertex v5 = new Vertex(new(1000, 0, 1000));
+        Vertex v6 = new Vertex(new(1750, 0, 200));
+        Vertex v7 = new Vertex(new(1800, 0, 1800));
+        Vertex v8 = new Vertex(new(2010, 0, 890));
+        Vertex v9 = new Vertex(new(650, 0, 1730));
+        Vertex v10 = new Vertex(new(3340, 0, 980));
+        Vertex v11 = new Vertex(new(-1000, 0, 1520));
+        Vertex v12 = new Vertex(new(2500, 0, 5000));
+        Vertex v13 = new Vertex(new(-1000, 0, -2000));
+        Vertex v14 = new Vertex(new(160, 0, 310));
+        Vertex v15 = new Vertex(new(1690, 0, 4750));
+        Vertex v16 = new Vertex(new(3000, 0, -2000));
+        Vertex v17 = new Vertex(new(1200, 0, -2340));
         List<Vertex> points = new();
         //points.Add(v1);
         points.Add(v2);
@@ -450,5 +476,6 @@ private void Awake()
         triangles = Triangulate(points);
         trianglesAndNeighbours = CalculateNeighbors(triangles);
         voronoiEdges = CreateVoronoiDiagram(trianglesAndNeighbours);
+        SpawnRoads(voronoiEdges);
     }
 }
