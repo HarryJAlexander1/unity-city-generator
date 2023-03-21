@@ -5,18 +5,22 @@ using UnityEngine;
 
 public class RoadGenVoronoi : MonoBehaviour
 {
+    List<Vertex> points;
     List<Triangle> triangles;
     Dictionary<Triangle, List<Triangle>> trianglesAndNeighbours;
     List<Edge> voronoiEdges;
+    List<Cell> voronoiCells;
 
     public GameObject segmentPrefab;
 
     private class Vertex {
 
+        private int _id;
         private Vector3Int _position;
-        public Vertex(Vector3Int position)
+        public Vertex(Vector3Int position, int id)
         {
             _position = position;
+            _id = id;
         }
 
         // getters and setters
@@ -24,6 +28,11 @@ public class RoadGenVoronoi : MonoBehaviour
         {
             get { return _position; }
             set { _position = value; }
+        }
+
+        public int Id {
+            get { return _id; }
+            set { _id = value; }
         }
     }
 
@@ -76,7 +85,7 @@ public class RoadGenVoronoi : MonoBehaviour
             _vertexC = vertexC;
 
             Vector2 circumcenterVector2 = GetCircumcenter(this);
-            _circumcenter = new(new((int)circumcenterVector2.x, 0, (int)circumcenterVector2.y));
+            _circumcenter = new(new((int)circumcenterVector2.x, 0, (int)circumcenterVector2.y), 0);
             _circumradius = Vector2.Distance(circumcenterVector2, new(VertexA.Position.x, VertexA.Position.z));
         }
 
@@ -126,7 +135,34 @@ public class RoadGenVoronoi : MonoBehaviour
             return sharedVertices == 2;
         }
     }
-  //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    private class Cell
+    {
+        private List<Vertex> _vertices;
+        private int _id;
+
+        private float _maxX;
+        private float _minX;
+
+        private float _maxZ;
+        private float _minZ;
+        public Cell(List<Vertex> vertices, int id)
+        {
+            _vertices = vertices;
+            _id = id;
+        }
+
+        public List<Vertex> Vertices {
+            get { return _vertices; }
+            set { _vertices = value; } 
+        }
+
+        public int Id {
+            get { return _id; }
+            set { _id = value; }
+        }
+    }
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     private Triangle InitialiseSuperTriangle(List<Vertex> pointList) {
 
         var maxX = 0;
@@ -152,9 +188,9 @@ public class RoadGenVoronoi : MonoBehaviour
         var dX = (maxX - minX) * 2;
         var dZ = (maxZ - minZ) * 2;
 
-        Vertex v1 = new Vertex(new(minX - dX, 0,  minZ - dZ * 3));
-        Vertex v2 = new Vertex(new(minX - dX, 0, maxZ + dZ));
-        Vertex v3 = new Vertex(new(maxX + dX * 3, 0, maxZ + dZ));
+        Vertex v1 = new Vertex(new(minX - dX, 0,  minZ - dZ * 3), 1);
+        Vertex v2 = new Vertex(new(minX - dX, 0, maxZ + dZ), 2);
+        Vertex v3 = new Vertex(new(maxX + dX * 3, 0, maxZ + dZ), 3);
 
         Triangle superTriangle = new Triangle(v1, v2, v3);
 
@@ -319,7 +355,8 @@ public class RoadGenVoronoi : MonoBehaviour
         return neighbors;
     }
 
-    private List<Edge> CreateVoronoiDiagram(Dictionary<Triangle, List<Triangle>> trianglesAndNeighbours)
+    // Create Edge objects for the diagram by looking at each triangle and its neighbours
+    private List<Edge> GetVoronoiEdges(Dictionary<Triangle, List<Triangle>> trianglesAndNeighbours)
     {
         List<Edge> voronoiEdges = new();
 
@@ -336,6 +373,26 @@ public class RoadGenVoronoi : MonoBehaviour
         return voronoiEdges;
     }
 
+    // Creates Cell objects from the cells in the voronoi diagram by looking at the original sites and triangulation
+    private List<Cell> GetVoronoiCells(List<Vertex> sites, List<Triangle> triangles)
+    {
+        List<Cell> cells = new();
+
+        foreach (Vertex site in sites) {
+
+            List<Vertex> circumcenters = new();
+
+            foreach (Triangle triangle in triangles) {
+
+                if (triangle.VertexA.Position == site.Position || triangle.VertexB.Position == site.Position || triangle.VertexC.Position == site.Position) { 
+                    circumcenters.Add(triangle.Circumcenter);
+                }
+            }
+            Cell cell = new(circumcenters, site.Id);
+            cells.Add(cell);
+        }
+        return cells;
+    }   
     private void SpawnRoads(List<Edge> edges) {
 
         List<Vector3> midpoints = new();
@@ -347,7 +404,8 @@ public class RoadGenVoronoi : MonoBehaviour
             Vector3 midpoint = (edge.VertexA.Position + edge.VertexB.Position) / 2;
 
             // iterate through list of previous midpoints to prevent duplicate road segments
-            for (int i = 0; i < midpoints.Count; i++) {
+            for (int i = 0; i < midpoints.Count; i++)
+            {
                 if (midpoint == midpoints[i]) { duplicatePosition = true; }
             }
 
@@ -367,7 +425,7 @@ public class RoadGenVoronoi : MonoBehaviour
         }
     }
 
-  /*  private void OnDrawGizmos()
+    private void OnDrawGizmos()
     {
         if (triangles == null)
             return;
@@ -379,10 +437,9 @@ public class RoadGenVoronoi : MonoBehaviour
             Gizmos.DrawLine(triangles[i].VertexB.Position, triangles[i].VertexC.Position);
             Gizmos.DrawLine(triangles[i].VertexC.Position, triangles[i].VertexA.Position);
 
-            //Gizmos.DrawSphere(triangles[i].Circumcenter.Position, 3f);
+           // Gizmos.DrawSphere(triangles[i].Circumcenter.Position, 30f);
         }
 
-        Gizmos.color = Color.black;
         foreach (Edge edge in voronoiEdges)
         {
             Gizmos.color = Color.blue;
@@ -390,24 +447,32 @@ public class RoadGenVoronoi : MonoBehaviour
             //Gizmos.DrawSphere(edge.VertexB.Position, 3f);
             Gizmos.DrawLine(edge.VertexA.Position, edge.VertexB.Position);
         }
+        Gizmos.color = Color.red;
 
-        Vertex v1 = new Vertex(new(200, 0, 1));
-        Vertex v2 = new Vertex(new(100, 0, 150));
-        Vertex v3 = new Vertex(new(300, 0, 75));
-        Vertex v4 = new Vertex(new(50, 0, 50));
-        Vertex v5 = new Vertex(new(100, 0, 100));
-        Vertex v6 = new Vertex(new(175, 0, 20));
-        Vertex v7 = new Vertex(new(180, 0, 180));
-        Vertex v8 = new Vertex(new(201, 0, 89));
-        Vertex v9 = new Vertex(new(65, 0, 173));
-        Vertex v10 = new Vertex(new(334, 0, 98));
-        Vertex v11 = new Vertex(new(-100, 0, 152));
-        Vertex v12 = new Vertex(new(250, 0, 500));
-        Vertex v13 = new Vertex(new(-100, 0, -200));
-        Vertex v14 = new Vertex(new(16, 0, 31));
-        Vertex v15 = new Vertex(new(169, 0, 475));
-        Vertex v16 = new Vertex(new(300, 0, -200));
-        Vertex v17 = new Vertex(new(120, 0, -234));
+        Gizmos.color = Color.blue;
+        foreach (Cell cell in voronoiCells) {
+            foreach (Vertex v in cell.Vertices) {
+                Gizmos.DrawSphere(v.Position, 40f);
+            }
+        }
+
+        Vertex v1 = new Vertex(new(2000, 0, 10), 1);
+        Vertex v2 = new Vertex(new(1000, 0, 1500), 2);
+        Vertex v3 = new Vertex(new(3000, 0, 750), 3);
+        Vertex v4 = new Vertex(new(500, 0, 500), 4);
+        Vertex v5 = new Vertex(new(1000, 0, 1000), 5);
+        Vertex v6 = new Vertex(new(1750, 0, 200), 6);
+        Vertex v7 = new Vertex(new(1800, 0, 1800), 7);
+        Vertex v8 = new Vertex(new(2010, 0, 890), 8);
+        Vertex v9 = new Vertex(new(650, 0, 1730), 9);
+        Vertex v10 = new Vertex(new(3340, 0, 980), 10);
+        Vertex v11 = new Vertex(new(-1000, 0, 1520), 11);
+        Vertex v12 = new Vertex(new(2500, 0, 5000), 12);
+        Vertex v13 = new Vertex(new(-1000, 0, -2000), 13);
+        Vertex v14 = new Vertex(new(160, 0, 310), 14);
+        Vertex v15 = new Vertex(new(1690, 0, 4750), 15);
+        Vertex v16 = new Vertex(new(3000, 0, -2000), 16);
+        Vertex v17 = new Vertex(new(1200, 0, -2340), 17);
 
         List<Vertex> testPoints = new();
         //testPoints.Add(v1);
@@ -431,30 +496,30 @@ public class RoadGenVoronoi : MonoBehaviour
         Gizmos.color = Color.red;
         foreach (Vertex point in testPoints)
         {
-            Gizmos.DrawSphere(point.Position, 3);
+            Gizmos.DrawSphere(point.Position, 30);
         }
-    }*/
+    }
 
-private void Awake()
+    private void Awake()
     {
-        Vertex v1 = new Vertex(new(2000, 0, 10));
-        Vertex v2 = new Vertex(new(1000, 0, 1500));
-        Vertex v3 = new Vertex(new(3000, 0, 750));
-        Vertex v4 = new Vertex(new(500, 0, 500));
-        Vertex v5 = new Vertex(new(1000, 0, 1000));
-        Vertex v6 = new Vertex(new(1750, 0, 200));
-        Vertex v7 = new Vertex(new(1800, 0, 1800));
-        Vertex v8 = new Vertex(new(2010, 0, 890));
-        Vertex v9 = new Vertex(new(650, 0, 1730));
-        Vertex v10 = new Vertex(new(3340, 0, 980));
-        Vertex v11 = new Vertex(new(-1000, 0, 1520));
-        Vertex v12 = new Vertex(new(2500, 0, 5000));
-        Vertex v13 = new Vertex(new(-1000, 0, -2000));
-        Vertex v14 = new Vertex(new(160, 0, 310));
-        Vertex v15 = new Vertex(new(1690, 0, 4750));
-        Vertex v16 = new Vertex(new(3000, 0, -2000));
-        Vertex v17 = new Vertex(new(1200, 0, -2340));
-        List<Vertex> points = new();
+        Vertex v1 = new Vertex(new(2000, 0, 10), 1);
+        Vertex v2 = new Vertex(new(1000, 0, 1500), 2);
+        Vertex v3 = new Vertex(new(3000, 0, 750), 3);
+        Vertex v4 = new Vertex(new(500, 0, 500), 4);
+        Vertex v5 = new Vertex(new(1000, 0, 1000), 5);
+        Vertex v6 = new Vertex(new(1750, 0, 200), 6);
+        Vertex v7 = new Vertex(new(1800, 0, 1800), 7);
+        Vertex v8 = new Vertex(new(2010, 0, 890), 8);
+        Vertex v9 = new Vertex(new(650, 0, 1730), 9);
+        Vertex v10 = new Vertex(new(3340, 0, 980), 10);
+        Vertex v11 = new Vertex(new(-1000, 0, 1520), 11);
+        Vertex v12 = new Vertex(new(2500, 0, 5000), 12);
+        Vertex v13 = new Vertex(new(-1000, 0, -2000), 13);
+        Vertex v14 = new Vertex(new(160, 0, 310), 14);
+        Vertex v15 = new Vertex(new(1690, 0, 4750), 15);
+        Vertex v16 = new Vertex(new(3000, 0, -2000), 16);
+        Vertex v17 = new Vertex(new(1200, 0, -2340), 17);
+        points = new();
         //points.Add(v1);
         points.Add(v2);
         points.Add(v3);
@@ -475,7 +540,16 @@ private void Awake()
 
         triangles = Triangulate(points);
         trianglesAndNeighbours = CalculateNeighbors(triangles);
-        voronoiEdges = CreateVoronoiDiagram(trianglesAndNeighbours);
-        SpawnRoads(voronoiEdges);
+        voronoiEdges = GetVoronoiEdges(trianglesAndNeighbours);
+        //SpawnRoads(voronoiEdges);
+        voronoiCells = GetVoronoiCells(points, triangles);
+        /*foreach (Cell cell in x) {
+            Debug.Log(cell.Vertices.Count);
+        }*/
+
+        foreach (Cell c in voronoiCells)
+        {
+            Debug.Log(c.Vertices.Count);
+        }
     }
 }
