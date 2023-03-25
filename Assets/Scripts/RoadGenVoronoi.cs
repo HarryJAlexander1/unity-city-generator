@@ -10,6 +10,8 @@ public class RoadGenVoronoi : MonoBehaviour
     Dictionary<Triangle, List<Triangle>> trianglesAndNeighbours;
     List<Edge> voronoiEdges;
     List<Cell> voronoiCells;
+    List<Vertex> triangulationConvexHull;
+    List<Edge> infiniteEdges;
 
     public GameObject segmentPrefab;
 
@@ -87,6 +89,12 @@ public class RoadGenVoronoi : MonoBehaviour
             Vector2 circumcenterVector2 = GetCircumcenter(this);
             _circumcenter = new(new((int)circumcenterVector2.x, 0, (int)circumcenterVector2.y), 0);
             _circumradius = Vector2.Distance(circumcenterVector2, new(VertexA.Position.x, VertexA.Position.z));
+        }
+        public IEnumerable<Edge> GetEdges()
+        {
+            yield return new Edge(_vertexA, _vertexB);
+            yield return new Edge(_vertexB, _vertexC);
+            yield return new Edge(_vertexC, _vertexA);
         }
 
         // getter and setters
@@ -355,6 +363,134 @@ public class RoadGenVoronoi : MonoBehaviour
         return neighbors;
     }
 
+    private List<Vertex> ComputeConvexHull(List<Vertex> points)
+    {
+        if (points.Count < 4)
+        {
+            throw new System.Exception("Convex hull requires at least 4 points.");
+        }
+
+        int leftMostIndex = 0;
+        for (int i = 1; i < points.Count; i++)
+        {
+            if (points[i].Position.x < points[leftMostIndex].Position.x)
+            {
+                leftMostIndex = i;
+            }
+        }
+
+        HashSet<Vertex> hull = new HashSet<Vertex>();
+        int currentIndex = leftMostIndex;
+        int nextIndex;
+
+        do
+        {
+            hull.Add(points[currentIndex]);
+            nextIndex = (currentIndex + 1) % points.Count;
+
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (Orientation(points[currentIndex], points[nextIndex], points[i]) < 0)
+                {
+                    nextIndex = i;
+                }
+            }
+
+            currentIndex = nextIndex;
+        } while (currentIndex != leftMostIndex);
+
+        return new List<Vertex>(hull);
+    }
+
+    private float Orientation(Vertex a, Vertex b, Vertex c)
+    {
+        return (b.Position.x - a.Position.x) * (c.Position.z - a.Position.z) - (b.Position.z - a.Position.z) * (c.Position.x - a.Position.x);
+    }
+    // DOES NOT WORK!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    private List<Edge> CalculateOuterEdges(List<Triangle> trianglulation, int maxLength) {
+        List<Edge> outerEdges = new();
+        List<Vertex> triangleVertices = new();
+        foreach (Triangle t in trianglulation)
+        {
+            triangleVertices.Add(t.VertexA);
+            triangleVertices.Add(t.VertexB);
+            triangleVertices.Add(t.VertexC);
+        }
+        HashSet<Vector3> uniquePositions = new HashSet<Vector3>();
+        List<Vertex> uniqueVertices = new List<Vertex>();
+
+        foreach (Vertex vertex in triangleVertices)
+        {
+            if (uniquePositions.Add(vertex.Position))
+            {
+                uniqueVertices.Add(vertex);
+            }
+        }
+
+        // Now uniqueVertices contains only the unique vertices based on their positions
+        Debug.Log("Unique vertices count: " + uniqueVertices.Count);
+
+        triangulationConvexHull = ComputeConvexHull(uniqueVertices);
+
+        HashSet<Edge> visitedEdges = new HashSet<Edge>(); // To avoid processing the same edge twice
+        // iterate through each triangle in triangulation
+        foreach (Triangle t in trianglulation) {
+            // get edges of each triangle
+            foreach (Edge e in t.GetEdges()) {
+                // if edge hasnt been processed and convexhull contains vertices A and B of edge 
+                if (!visitedEdges.Contains(e) && triangulationConvexHull.Contains(e.VertexA) && triangulationConvexHull.Contains(e.VertexB)) {
+
+                    // get circumcenter of triangle
+                    Vertex startPoint = t.Circumcenter;
+                    // get edges of the triangle
+                    List<Edge> triangleEdges = new();
+                    foreach (Edge edge in t.GetEdges()) {
+                        triangleEdges.Add(edge);
+                    }
+                    Vector3 crossProduct = CrossProduct(triangleEdges[0], triangleEdges[1]);
+
+                    // Normalize the cross product
+                    Vector3 normal = crossProduct.normalized;
+                    int length = 3000;
+                    Vector3Int normalTimesLength = new((int)normal.x * length, (int)normal.y * length, (int)normal.z * length);
+                    Vector3Int endpointPosition = startPoint.Position + normalTimesLength;
+
+                    // Create an edge between the Voronoi vertex and the endpoint
+                    // You can use the endpoint and the Voronoi vertex to create a line segment or an edge in Unity or other game engines
+                    Vertex endpoint = new(endpointPosition, 1);
+
+                    Edge outerEdge = new(startPoint, endpoint); 
+                    outerEdges.Add(outerEdge);
+                }
+                visitedEdges.Add(e);
+            }
+        }
+        return outerEdges;
+    }
+
+    static Vector3 CrossProduct(Edge edge1, Edge edge2)
+    {
+        // Convert the vertices to float arrays
+        float[] v1 = new float[] { edge1.VertexA.Position.x, edge1.VertexA.Position.y, edge1.VertexA.Position.z };
+        float[] v2 = new float[] { edge1.VertexB.Position.x, edge1.VertexB.Position.y, edge1.VertexB.Position.z };
+        float[] v3 = new float[] { edge2.VertexB.Position.x, edge2.VertexB.Position.y, edge2.VertexB.Position.z };
+
+        // Calculate the edge vectors
+        float[] e1 = new float[] { v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2] };
+        float[] e2 = new float[] { v3[0] - v1[0], v3[1] - v1[1], v3[2] - v1[2] };
+
+        // Calculate the cross product of the edge vectors
+        float[] cross = new float[] {
+            e1[1] * e2[2] - e1[2] * e2[1],
+            e1[2] * e2[0] - e1[0] * e2[2],
+            e1[0] * e2[1] - e1[1] * e2[0]
+        };
+
+        // Return the cross product as a Vector3 object
+        return new Vector3(cross[0], cross[1], cross[2]);
+    }
+
+    //----------------------------------------------------------------------------------------------------------------------------------------------------------
     // Create Edge objects for the diagram by looking at each triangle and its neighbours
     private List<Edge> GetVoronoiEdges(Dictionary<Triangle, List<Triangle>> trianglesAndNeighbours)
     {
@@ -420,7 +556,7 @@ public class RoadGenVoronoi : MonoBehaviour
                 midpoints.Add(midpoint);
 
                 // Set the length
-                road.transform.localScale = new(road.transform.localScale.x * 5, road.transform.localScale.y, (road.transform.localScale.z * (float)edge.Length));
+                road.transform.localScale = new(road.transform.localScale.x * 10, road.transform.localScale.y, (road.transform.localScale.z * (float)edge.Length));
             }  
         }
     }
@@ -437,24 +573,36 @@ public class RoadGenVoronoi : MonoBehaviour
             Gizmos.DrawLine(triangles[i].VertexB.Position, triangles[i].VertexC.Position);
             Gizmos.DrawLine(triangles[i].VertexC.Position, triangles[i].VertexA.Position);
 
-           // Gizmos.DrawSphere(triangles[i].Circumcenter.Position, 30f);
+            // Gizmos.DrawSphere(triangles[i].Circumcenter.Position, 30f);
         }
 
+        Gizmos.color = Color.blue;
         foreach (Edge edge in voronoiEdges)
         {
-            Gizmos.color = Color.blue;
             //Gizmos.DrawSphere(edge.VertexA.Position, 3f);
             //Gizmos.DrawSphere(edge.VertexB.Position, 3f);
             Gizmos.DrawLine(edge.VertexA.Position, edge.VertexB.Position);
         }
-        Gizmos.color = Color.red;
+      /*  Gizmos.color = Color.red;
+        foreach (Edge e in infiniteEdges) {
+            Gizmos.DrawLine(e.VertexA.Position, e.VertexB.Position);
+            Gizmos.DrawSphere(e.VertexB.Position, 50f);
+            Gizmos.DrawSphere(e.VertexA.Position, 50f);
+        }*/
+       
 
         Gizmos.color = Color.blue;
-        foreach (Cell cell in voronoiCells) {
-            foreach (Vertex v in cell.Vertices) {
+        foreach (Cell cell in voronoiCells)
+        {
+            foreach (Vertex v in cell.Vertices)
+            {
                 Gizmos.DrawSphere(v.Position, 40f);
             }
         }
+       /* for (int i = 0; i < voronoiCells[4].Vertices.Count; i++)
+        {
+            Gizmos.DrawSphere(voronoiCells[4].Vertices[i].Position, 30f);
+        }*/
 
         Vertex v1 = new Vertex(new(2000, 0, 10), 1);
         Vertex v2 = new Vertex(new(1000, 0, 1500), 2);
@@ -498,6 +646,22 @@ public class RoadGenVoronoi : MonoBehaviour
         {
             Gizmos.DrawSphere(point.Position, 30);
         }
+
+        Gizmos.color = Color.blue;
+        /*foreach (Vertex point in hull)
+        {
+            Gizmos.DrawSphere(point.Position, 30);
+        }*/
+
+        foreach (Edge e in infiniteEdges)
+        {
+            Gizmos.DrawLine(e.VertexA.Position, e.VertexB.Position);
+            Gizmos.DrawSphere(e.VertexA.Position, 30);
+        }
+        Gizmos.color = Color.magenta;
+        foreach (Vertex v in triangulationConvexHull) {
+            Gizmos.DrawSphere(v.Position, 40);
+        }
     }
 
     private void Awake()
@@ -539,6 +703,7 @@ public class RoadGenVoronoi : MonoBehaviour
         points.Add(v17);
 
         triangles = Triangulate(points);
+       // Debug.Log(triangles.Count);
         trianglesAndNeighbours = CalculateNeighbors(triangles);
         voronoiEdges = GetVoronoiEdges(trianglesAndNeighbours);
         //SpawnRoads(voronoiEdges);
@@ -547,9 +712,14 @@ public class RoadGenVoronoi : MonoBehaviour
             Debug.Log(cell.Vertices.Count);
         }*/
 
-        foreach (Cell c in voronoiCells)
+        /*foreach (Cell c in voronoiCells)
         {
             Debug.Log(c.Vertices.Count);
-        }
+        }*/
+        // get voronoiVertices
+
+        //Debug.Log(hull.Count);
+        infiniteEdges = CalculateOuterEdges(triangles, 1000);
+        //Debug.Log(infiniteEdges.Count);
     }
 }
