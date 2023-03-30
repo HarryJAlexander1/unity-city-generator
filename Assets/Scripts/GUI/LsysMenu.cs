@@ -8,6 +8,7 @@ public class LsysMenu : MonoBehaviour
     public TMP_InputField axiomInputField;
     public TMP_InputField iterationsInputField;
     public TMP_InputField roadLengthInputField;
+    public TMP_InputField nameInputField;
     public Vector3 spawnPosition;
 
     public GameObject gameManager;
@@ -70,6 +71,19 @@ public class LsysMenu : MonoBehaviour
             Debug.LogError("Error: Road length is not valid");
             return false; // input value is not valid
         }
+        else if (inputField == nameInputField)
+        {
+            if (inputField.text.Length > 0 && inputField.text.Length <= 15)
+            {
+                return true; // input value is valid
+            }
+            else
+            {
+                Debug.LogError("Error: Name is not valid");
+                return false; // input value is not valid
+            }
+
+        }
         else 
         { 
             Debug.LogError("Invalid inputField");
@@ -79,7 +93,7 @@ public class LsysMenu : MonoBehaviour
 
     public void SendParameters() {
         var gameManagerScript = gameManager.GetComponent<GameManager>();
-        gameManagerScript.CreateLSysCityGenerator(spawnPosition, axiomInputField.text, int.Parse(iterationsInputField.text), int.Parse(roadLengthInputField.text));
+        gameManagerScript.CreateLSysCityGenerator(spawnPosition, axiomInputField.text, int.Parse(iterationsInputField.text), int.Parse(roadLengthInputField.text), nameInputField.text);
     }
 
     public void CloseLSysMenu()
@@ -92,7 +106,7 @@ public class LsysMenu : MonoBehaviour
         if (CheckInputsFilled())
         {
             // Check each input field text is valid
-            if (CheckInputFieldIsValid(axiomInputField) && CheckInputFieldIsValid(iterationsInputField) && CheckInputFieldIsValid(roadLengthInputField))
+            if (CheckInputFieldIsValid(axiomInputField) && CheckInputFieldIsValid(iterationsInputField) && CheckInputFieldIsValid(roadLengthInputField) && CheckInputFieldIsValid(nameInputField))
             {
                 // if they are, send data to Game Manager
                 SendParameters();
