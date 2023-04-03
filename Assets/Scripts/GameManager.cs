@@ -7,25 +7,21 @@ public class GameManager : MonoBehaviour
     // City generator prefabs
     public GameObject lindenmayerPrefab;
     public GameObject voronoiPrefab;
-
+    public GameObject edgePrefab;
     // Terrain prefabs
     public GameObject planePrefab;
 
     // Canvas
     public GameObject canvas;
 
+    public GameObject segmentPrefab;
     private GameObject terrain;
-  
+    public List<GameObject> edges; 
 
-    // Start is called before the first frame update
-    void Start()
-    {
-       
-    }
 
-    private void Update()
-    {
-        
+    public GameObject CreateRoadSegment() {
+        GameObject seg = Instantiate(segmentPrefab, new(0,0,0), Quaternion.identity);
+        return seg;
     }
 
     public void CreateVoronoiCityGenerator() {
@@ -44,5 +40,24 @@ public class GameManager : MonoBehaviour
     public void CreateTerrrain(Vector3 pos, GameObject terrainPrefab) {
         terrain = Instantiate(terrainPrefab, pos, Quaternion.identity);
         terrain.tag = "Terrain";
+    }
+
+    public void CreateEdge(GameObject edgePrefab, Vector3 VertexAPos, Vector3 VertexBPos, Color colour) {
+        GameObject edge = Instantiate(edgePrefab, new(0, 0, 0), Quaternion.identity);
+        EdgeController edgeController = edge.GetComponent<EdgeController>();
+        edgeController.position1 = VertexAPos;
+        edgeController.position2 = VertexBPos;
+        edgeController.edgeColor = colour;
+        edges.Add(edge);
+    }
+
+    public void DestroyEdges() {
+        if (edges.Count != 0) {
+            for  (int i=0; i < edges.Count; i++)
+            {
+                Destroy(edges[i]);
+            }
+            edges.Clear();
+        } 
     }
   }

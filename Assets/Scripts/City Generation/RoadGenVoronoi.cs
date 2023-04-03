@@ -5,17 +5,21 @@ using UnityEngine;
 
 public class RoadGenVoronoi : MonoBehaviour
 {
+    public LineRenderer lineRenderer;
     public List<Vertex> points;
     public List<Triangle> triangleList;
     public Dictionary<Triangle, List<Triangle>> trianglesAndNeighbours;
     public List<Edge> voronoiEdgeList;
-    public List <Cell> voronoiCells;
+    public List<Cell> voronoiCells;
     public List<Vertex> uniqueTriangleVertices;
     public List<Vertex> triangulationConvexHull;
+    public List<GameObject> roadSegments;
     //List<Edge> infiniteEdges;
 
     public GameObject segmentPrefab;
+    public GameObject gameManager;
 
+    private GameObject city;
     public class Vertex {
 
         private int _id;
@@ -65,9 +69,9 @@ public class RoadGenVoronoi : MonoBehaviour
             set { _vertexB = value; }
         }
 
-        public double Length 
+        public double Length
         {
-            get { return _length;}
+            get { return _length; }
             set { _length = value; }
         }
     }
@@ -99,7 +103,7 @@ public class RoadGenVoronoi : MonoBehaviour
         }
 
         // getter and setters
-        public Vertex VertexA 
+        public Vertex VertexA
         {
             get { return _vertexA; }
             set { _vertexA = value; }
@@ -125,7 +129,7 @@ public class RoadGenVoronoi : MonoBehaviour
             get { return _circumradius; }
             set { _circumradius = value; }
         }
-       
+
         public bool SharesEdge(Triangle other)
         {
             int sharedVertices = 0;
@@ -163,7 +167,7 @@ public class RoadGenVoronoi : MonoBehaviour
 
         public List<Vertex> Vertices {
             get { return _vertices; }
-            set { _vertices = value; } 
+            set { _vertices = value; }
         }
 
         public int Id {
@@ -187,10 +191,10 @@ public class RoadGenVoronoi : MonoBehaviour
     private Triangle InitialiseSuperTriangle(List<Vertex> pointList) {
 
         var maxX = 0;
-        var minX = 1000;
+        var minX = 10000;
 
         var maxZ = 0;
-        var minZ = 1000;
+        var minZ = 10000;
 
         List<int> squareVertices = new();
         foreach (Vertex point in pointList) {
@@ -209,7 +213,7 @@ public class RoadGenVoronoi : MonoBehaviour
         var dX = (maxX - minX) * 2;
         var dZ = (maxZ - minZ) * 2;
 
-        Vertex v1 = new Vertex(new(minX - dX, 0,  minZ - dZ * 3), 1);
+        Vertex v1 = new Vertex(new(minX - dX, 0, minZ - dZ * 3), 1);
         Vertex v2 = new Vertex(new(minX - dX, 0, maxZ + dZ), 2);
         Vertex v3 = new Vertex(new(maxX + dX * 3, 0, maxZ + dZ), 3);
 
@@ -313,8 +317,8 @@ public class RoadGenVoronoi : MonoBehaviour
 
         for (int n = 0; n < pointList.Count; n++) {
             List<Edge> edges = new List<Edge>();
-            
-            for (int i = triangles.Count-1; i >= 0; i--) {
+
+            for (int i = triangles.Count - 1; i >= 0; i--) {
                 // if point is inside triangle circumcircle
                 if (IsPointInCircumcircle(pointList[n], triangles[i])) {
                     // add triangle's edges to edges
@@ -328,7 +332,7 @@ public class RoadGenVoronoi : MonoBehaviour
 
             // Remove any duplicate edges from the list
             for (int j = 0; j < edges.Count; j++) {
-                for (int k = j+1; k < edges.Count; k++) {
+                for (int k = j + 1; k < edges.Count; k++) {
                     if (edges[j].VertexA == edges[k].VertexB && edges[j].VertexB == edges[k].VertexA) {
                         edges.RemoveAt(k);
                         edges.RemoveAt(j);
@@ -336,7 +340,7 @@ public class RoadGenVoronoi : MonoBehaviour
                     }
                 }
             }
-        
+
             // Create new triangles from the edges and current point and add to list
             for (int x = 0; x < edges.Count; x++) {
                 Edge ab = new(edges[x].VertexA, edges[x].VertexB);
@@ -533,7 +537,7 @@ public class RoadGenVoronoi : MonoBehaviour
 
             foreach (Triangle triangle in triangles) {
 
-                if (triangle.VertexA.Position == site.Position || triangle.VertexB.Position == site.Position || triangle.VertexC.Position == site.Position) { 
+                if (triangle.VertexA.Position == site.Position || triangle.VertexB.Position == site.Position || triangle.VertexC.Position == site.Position) {
                     circumcenters.Add(triangle.Circumcenter);
                 }
             }
@@ -541,7 +545,7 @@ public class RoadGenVoronoi : MonoBehaviour
             cells.Add(cell);
         }
         voronoiCells = cells;
-    }   
+    }
     public void SpawnRoads(List<Edge> edges) {
 
         List<Vector3> midpoints = new();
@@ -565,12 +569,16 @@ public class RoadGenVoronoi : MonoBehaviour
                 Quaternion rotation = Quaternion.LookRotation(direction);
 
                 // Instantiate a new road prefab
-                GameObject road = Instantiate(segmentPrefab, midpoint, rotation);
+                GameManager gameManagerScript = gameManager.GetComponent<GameManager>();
+                GameObject road = gameManagerScript.CreateRoadSegment();
+                road.transform.position = new(midpoint.x, midpoint.y + 1, midpoint.z);
+                road.transform.rotation = rotation;
+                roadSegments.Add(road);
                 midpoints.Add(midpoint);
 
                 // Set the length
-                road.transform.localScale = new(road.transform.localScale.x * 10, road.transform.localScale.y, (road.transform.localScale.z * (float)edge.Length));
-            }  
+                road.transform.localScale = new(road.transform.localScale.x * 2, road.transform.localScale.y, (road.transform.localScale.z * (float)edge.Length));
+            }
         }
     }
 
@@ -596,15 +604,55 @@ public class RoadGenVoronoi : MonoBehaviour
         uniqueTriangleVertices = uniqueVertices;
     }
 
+    public void DestroyRoads(List<GameObject> roadList) {
+        if (roadList.Count > 0) {
+            foreach (GameObject road in roadList)
+            {
+                // delete road segments
+
+                Destroy(road);
+            }
+            roadList.Clear();
+        }
+    }
     public void Pipeline(List<GameObject> pointGameObjects) {
 
+        DestroyEdges();
+
         CreatePointsFromGameObjectPositions(pointGameObjects);
+
         Triangulate(points);
+
+
+
         CalculateNeighbors(triangleList);
+
+
         GetVoronoiEdges(trianglesAndNeighbours);
+
+
         GetVoronoiCells(points, triangleList);
+
         CalculateUniqueTriangleVertices(triangleList);
+
         ComputeConvexHull(uniqueTriangleVertices);
+
+        List<Edge> triangleEdges = new();
+        foreach (Triangle triangle in triangleList)
+        {
+            // get edges
+            Edge edge1 = new Edge(triangle.VertexA, triangle.VertexB);
+            Edge edge2 = new Edge(triangle.VertexB, triangle.VertexC);
+            Edge edge3 = new Edge(triangle.VertexC, triangle.VertexA);
+
+            triangleEdges.Add(edge1);
+            triangleEdges.Add(edge2);
+            triangleEdges.Add(edge3);
+        }
+
+        DrawEdges(triangleEdges, Color.red);
+        DrawEdges(voronoiEdgeList, Color.blue);
+
     }
 
     //private void OnDrawGizmos()
@@ -686,12 +734,37 @@ public class RoadGenVoronoi : MonoBehaviour
     //    }
     //}
 
+    public void DrawEdges(List<Edge> edges, Color colour)
+    {
+        gameManager = GameObject.FindGameObjectWithTag("Game Manager");
+        GameManager gameManagerScript = gameManager.GetComponent<GameManager>();
+        foreach (Edge edge in edges) {
+            gameManagerScript.CreateEdge(gameManagerScript.edgePrefab, edge.VertexA.Position, edge.VertexB.Position, colour);
+        }
+    }
+
+    public void DestroyEdges() {
+        gameManager = GameObject.FindGameObjectWithTag("Game Manager");
+        GameManager gameManagerScript = gameManager.GetComponent<GameManager>();
+
+        gameManagerScript.DestroyEdges();
+    }
+
+    public void GroupIntoCity(string cityName) {
+        city = new GameObject(cityName);
+        city.tag = "City";
+
+        foreach (GameObject seg in roadSegments) {
+            seg.transform.parent = city.transform;
+        }
+    }
+
+
     private void Awake()
     {
         
     }
 
-   
 
     //private void Awake()
     //{

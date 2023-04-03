@@ -8,14 +8,17 @@ public class UIController : MonoBehaviour
     public GameObject gameManager;
     public GameObject terrainMenu;
     public GameObject lsysMenu;
+    public GameObject saveVoronoiCityMenu;
+    public GameObject saveButton;
     public Camera mainCamera;
     public GameObject terrainObject;
 
     private GameObject voronoiGenerator; 
     public GameObject vertexPrefab;
-    List<GameObject> vertices = new();
+    public List<GameObject> vertices = new();
 
     private bool terrainActive = false;
+    public bool voronoiGeneratorExists = false;
     private int generator;
 
  
@@ -42,9 +45,19 @@ public class UIController : MonoBehaviour
     }
 
     public void SelectVoronoiGenerator() {
-        generator = 2;
-        var gameManagerScript = gameManager.GetComponent<GameManager>();
-        gameManagerScript.CreateVoronoiCityGenerator();
+        if (!voronoiGeneratorExists) {
+            generator = 2;
+            var gameManagerScript = gameManager.GetComponent<GameManager>();
+            gameManagerScript.CreateVoronoiCityGenerator();
+        }
+        voronoiGeneratorExists = true;
+    }
+
+    public void OpenSaveMenu() {
+
+        saveVoronoiCityMenu.SetActive(true);
+        saveButton.SetActive(false);
+        generator = 0;
     }
 
     public void CheckSpawnCityGenerator(int generatorChoice) {
@@ -72,6 +85,14 @@ public class UIController : MonoBehaviour
                 {
                     GameObject v = Instantiate(vertexPrefab, new(spawnPosition.x, spawnPosition.y+2, spawnPosition.z), Quaternion.identity);
                     vertices.Add(v);
+                    if (generator == 2 && vertices.Count >= 4)
+                    {
+                        // send vertices to Voronoi generator by calling triangulate function
+                        voronoiGenerator = GameObject.FindGameObjectWithTag("Voronoi");
+                        RoadGenVoronoi voronoiScript = voronoiGenerator.GetComponent<RoadGenVoronoi>();
+                        // call the pipeline in RoadGenVoronoi
+                        voronoiScript.Pipeline(vertices);
+                    }
                 }
                 else { return; }
             }
@@ -86,11 +107,38 @@ public class UIController : MonoBehaviour
         // Loop through all game objects and destroy them if they have "City" or "RoadGenerator" tags
         foreach (GameObject obj in allObjects)
         {
-            if (obj.CompareTag("City") || obj.CompareTag("CityGenerator"))
+            if (obj.CompareTag("City") || obj.CompareTag("CityGenerator") || obj.CompareTag("Edge"))
             {
                 Destroy(obj);
+                
+            }
+            if (obj.CompareTag("Vertex"))
+            {
+                vertices.Clear();
+                Destroy(obj);
+            }
+            if (obj.CompareTag("Road"))
+            {
+                var gameManagerScript = gameManager.GetComponent<GameManager>();
+                gameManagerScript.edges.Clear();
+                Destroy(obj);
+            }
+            if (obj.CompareTag("Voronoi")) {
+                Destroy(obj);
+                voronoiGeneratorExists = false;
             }
         }
+        // Close all menus
+        if (saveButton.activeInHierarchy) {
+            saveButton.SetActive(false);
+        }
+        if (lsysMenu.activeInHierarchy) {
+            saveButton.SetActive(false);
+        }
+        if (saveVoronoiCityMenu.activeInHierarchy) {
+            saveVoronoiCityMenu.SetActive(false);
+        }
+        generator = 0;
     }
 
     private void Update()
@@ -108,15 +156,17 @@ public class UIController : MonoBehaviour
             }
         }
         CheckSpawnCityGenerator(generator);
+        if (Input.GetKey(KeyCode.Space) && generator == 2)
+        {
+            saveButton.SetActive(true);
 
-        if (generator == 2 && vertices.Count > 2) {
-            // send vertices to Voronoi generator by calling triangulate function
             voronoiGenerator = GameObject.FindGameObjectWithTag("Voronoi");
             RoadGenVoronoi voronoiScript = voronoiGenerator.GetComponent<RoadGenVoronoi>();
-            // call the pipeline in RoadGenVoronoi
-            voronoiScript.Pipeline(vertices);
-            //voronoiScript.SpawnRoads(voronoiScript.voronoiEdgeList);
+
+            //voronoiScript.DestroyRoads(voronoiScript.roadSegments);
+            voronoiScript.DestroyRoads(voronoiScript.roadSegments);
+            voronoiScript.SpawnRoads(voronoiScript.voronoiEdgeList);
         }
-        
+
     }
 }
