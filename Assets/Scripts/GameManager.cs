@@ -8,6 +8,8 @@ public class GameManager : MonoBehaviour
     public GameObject lindenmayerPrefab;
     public GameObject voronoiPrefab;
     public GameObject edgePrefab;
+    public GameObject vertexPrefab;
+    public GameObject meshGeneratorPrefab;
     // Terrain prefabs
     public GameObject planePrefab;
 
@@ -49,6 +51,17 @@ public class GameManager : MonoBehaviour
         edgeController.position2 = VertexBPos;
         edgeController.edgeColor = colour;
         edges.Add(edge);
+    }
+
+
+    public GameObject CreateVertex(GameObject vertexPrefab, Vector3 pos) {
+        GameObject v = Instantiate(vertexPrefab, pos, Quaternion.identity);
+        return v;
+    }
+
+    public GameObject CreateMeshGenerator(Vector3 pos) {
+        GameObject g = Instantiate(meshGeneratorPrefab, pos, Quaternion.identity);
+        return g;
     }
 
     public void DestroyEdges() {

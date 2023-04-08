@@ -16,13 +16,31 @@ public class RoadGenLindenmayer : MonoBehaviour
     List<string> commandSequence = new();
 
     public GameObject segmentPrefab;
-    public List<GameObject> blockPrefabs;
+    public List<GameObject> cityCenterBlockPrefabs;
+    public List<GameObject> highDensityBlockPrefabs;
+    public List<GameObject> mediumDensityBlockPrefabs;
+    public List<GameObject> lowDensityBlockPrefabs;
 
     private GameObject city;
+
+    private Vector3 startPoint;
+
+    private float minDistCityCenter = 0f;
+    private float maxDistCityCenter = 100f;
+    private float minDistHighDensity = 101f;
+    private float maxDistHighDensity = 250f;
+    private float minDistMediumDensity = 251f;
+    private float maxDistMediumDensity = 600f;
 
     private void FixedUpdate()
     {
         StartExecution();
+    }
+
+    private void Awake()
+    {
+        // Get intial starting location of generator
+        startPoint = transform.position;
     }
 
     public string GenerateSentence(int maxIterations, string axiom) {
@@ -175,10 +193,40 @@ public class RoadGenLindenmayer : MonoBehaviour
     }
 
     public GameObject SpawnBlock(Vector3 pos) {
-        // random int i 
-        int i = Random.Range(0, blockPrefabs.Count);
-        // select i from list of blocks
-        GameObject cityBlock = Instantiate(blockPrefabs[i], pos, Quaternion.identity);
+
+        // calculate distance of pos to starting point
+        float distanceFromStartPoint = Vector3.Distance(startPoint, pos);
+        GameObject cityBlock;
+
+        if (distanceFromStartPoint >= minDistCityCenter && distanceFromStartPoint <= maxDistCityCenter)
+        {
+            // spawn random building from 'city center buildings' list 
+            int i = Random.Range(0, cityCenterBlockPrefabs.Count);
+            // select i from list of blocks
+            cityBlock = Instantiate(cityCenterBlockPrefabs[i], pos, Quaternion.identity);
+        }
+        else if (distanceFromStartPoint >= minDistHighDensity && distanceFromStartPoint <= maxDistHighDensity) {
+
+            // spawn random building from 'high density buildings' list 
+            int i = Random.Range(0, highDensityBlockPrefabs.Count);
+            // select i from list of blocks
+            cityBlock = Instantiate(highDensityBlockPrefabs[i], pos, Quaternion.identity);
+        }
+        else if (distanceFromStartPoint >= minDistMediumDensity && distanceFromStartPoint <= maxDistMediumDensity)
+        {
+            // spawn random building from 'medium density buildings' list 
+            int i = Random.Range(0, mediumDensityBlockPrefabs.Count);
+            // select i from list of blocks
+            cityBlock = Instantiate(mediumDensityBlockPrefabs[i], pos, Quaternion.identity);
+        }
+        else
+        {
+            // spawn random building from 'low density buildings' list 
+            int i = Random.Range(0, lowDensityBlockPrefabs.Count);
+            // select i from list of blocks
+            cityBlock = Instantiate(lowDensityBlockPrefabs[i], pos, Quaternion.identity);
+        }
+
         cityBlock.transform.localScale = cityBlock.transform.localScale * ((length * 0.1f)* 0.8f);
         cityBlock.transform.parent = city.transform;
         return cityBlock;

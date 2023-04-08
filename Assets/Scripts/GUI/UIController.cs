@@ -21,7 +21,11 @@ public class UIController : MonoBehaviour
     public bool voronoiGeneratorExists = false;
     private int generator;
 
- 
+    public GameObject objectToDrag;
+    private Vector3 screenPoint;
+    private Vector3 offset;
+
+
     public void OpenTerrainMenu() {
         terrainMenu.SetActive(true);
         Debug.Log("Terrain menu opened");
@@ -83,7 +87,8 @@ public class UIController : MonoBehaviour
                 }
                 else if (generatorChoice == 2)
                 {
-                    GameObject v = Instantiate(vertexPrefab, new(spawnPosition.x, spawnPosition.y+2, spawnPosition.z), Quaternion.identity);
+                    GameObject v = gameManagerScript.CreateVertex(vertexPrefab, new(spawnPosition.x, spawnPosition.y + 2, spawnPosition.z));
+                    /*GameObject v = Instantiate(vertexPrefab, new(spawnPosition.x, spawnPosition.y+2, spawnPosition.z), Quaternion.identity);*/
                     vertices.Add(v);
                     if (generator == 2 && vertices.Count >= 4)
                     {
@@ -127,6 +132,11 @@ public class UIController : MonoBehaviour
                 Destroy(obj);
                 voronoiGeneratorExists = false;
             }
+            if (obj.CompareTag("MeshRenderer")) {
+                Destroy(obj);
+                RoadGenVoronoi roadGenScript = voronoiGenerator.GetComponent<RoadGenVoronoi>();
+                roadGenScript.meshGenerators.Clear();
+            }
         }
         // Close all menus
         if (saveButton.activeInHierarchy) {
@@ -140,6 +150,41 @@ public class UIController : MonoBehaviour
         }
         generator = 0;
     }
+
+   /* public void MoveVertexObject()
+    {
+        if (Input.GetMouseButtonDown(1))
+        {
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RaycastHit hit;
+            if (Physics.Raycast(ray, out hit))
+            {
+                if (vertices.Contains(hit.collider.gameObject))
+                {
+                    objectToDrag = hit.collider.gameObject;
+                    UpdateScreenPointAndOffset();
+                }
+            }
+        }
+
+        if (Input.GetMouseButton(1) && objectToDrag != null)
+        {
+            Vector3 curScreenPoint = new Vector3(Input.mousePosition.x, Input.mousePosition.y, screenPoint.z);
+            Vector3 curPosition = Camera.main.ScreenToWorldPoint(curScreenPoint) + offset;
+            objectToDrag.transform.position = new Vector3(curPosition.x, objectToDrag.transform.position.y, curPosition.z);
+        }
+
+        if (Input.GetMouseButtonUp(1))
+        {
+            objectToDrag = null;
+        }
+    }
+
+    private void UpdateScreenPointAndOffset()
+    {
+        screenPoint = Camera.main.WorldToScreenPoint(objectToDrag.transform.position);
+        offset = objectToDrag.transform.position - Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y, screenPoint.z));
+    }*/
 
     private void Update()
     {
@@ -168,5 +213,7 @@ public class UIController : MonoBehaviour
             voronoiScript.SpawnRoads(voronoiScript.voronoiEdgeList);
         }
 
+       //MoveVertexObject();
     }
+
 }

@@ -1,3 +1,4 @@
+
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,26 +13,29 @@ public class RoadGenVoronoi : MonoBehaviour
     public List<Edge> voronoiEdgeList;
     public List<Cell> voronoiCells;
     public List<Vertex> uniqueTriangleVertices;
-    public List<Vertex> triangulationConvexHull;
+    public List<Vertex> convexHull = new();
     public List<GameObject> roadSegments;
+    public List<GameObject> meshGenerators;
     //List<Edge> infiniteEdges;
+    public List<GameObject> pointGameObjects = new();
 
     public GameObject segmentPrefab;
     public GameObject gameManager;
 
     private GameObject city;
+
     public class Vertex {
 
         private int _id;
-        private Vector3Int _position;
-        public Vertex(Vector3Int position, int id)
+        private Vector3 _position;
+        public Vertex(Vector3 position, int id)
         {
             _position = position;
             _id = id;
         }
 
         // getters and setters
-        public Vector3Int Position
+        public Vector3 Position
         {
             get { return _position; }
             set { _position = value; }
@@ -92,7 +96,7 @@ public class RoadGenVoronoi : MonoBehaviour
             _vertexC = vertexC;
 
             Vector2 circumcenterVector2 = GetCircumcenter(this);
-            _circumcenter = new(new((int)circumcenterVector2.x, 0, (int)circumcenterVector2.y), 0);
+            _circumcenter = new(new(circumcenterVector2.x, 0, circumcenterVector2.y), 0);
             _circumradius = Vector2.Distance(circumcenterVector2, new(VertexA.Position.x, VertexA.Position.z));
         }
         public IEnumerable<Edge> GetEdges()
@@ -152,17 +156,19 @@ public class RoadGenVoronoi : MonoBehaviour
     public class Cell
     {
         private List<Vertex> _vertices;
-        private int _id;
+     
+        private Vertex _site;
 
         private float _maxX;
         private float _minX;
 
         private float _maxZ;
         private float _minZ;
-        public Cell(List<Vertex> vertices, int id)
+        public Cell(List<Vertex> vertices, Vertex site)
         {
             _vertices = vertices;
-            _id = id;
+            _site = site;
+   
         }
 
         public List<Vertex> Vertices {
@@ -170,33 +176,34 @@ public class RoadGenVoronoi : MonoBehaviour
             set { _vertices = value; }
         }
 
-        public int Id {
-            get { return _id; }
-            set { _id = value; }
+        public Vertex Site {
+            get { return _site; }
+            set { _site = value; }
         }
     }
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-    public void CreatePointsFromGameObjectPositions(List<GameObject> pointGOs) {
+    public List<Vertex> CreatePointsFromGameObjectPositions(List<GameObject> pointGOs) {
         // initialise list of vertices
         List<Vertex> vertices = new();
         // iterate through each pointGO
         for (int i = 0; i < pointGOs.Count; i++) {
             // instantiate new Vertex
-            Vertex p = new(Vector3Int.RoundToInt(pointGOs[i].transform.position), i);
+            Vertex p = new(pointGOs[i].transform.position, i);
             vertices.Add(p);
+            pointGameObjects.Add(pointGOs[i]);
         }
-        points = vertices;
+        return vertices;
     }
     private Triangle InitialiseSuperTriangle(List<Vertex> pointList) {
 
-        var maxX = 0;
-        var minX = 10000;
+        var maxX = 0f;
+        var minX = 10000f;
 
-        var maxZ = 0;
-        var minZ = 10000;
+        var maxZ = 0f;
+        var minZ = 10000f;
 
-        List<int> squareVertices = new();
+        List<float> squareVertices = new();
         foreach (Vertex point in pointList) {
             maxX = Mathf.Max(maxX, point.Position.x);
             minX = Mathf.Min(minX, point.Position.x);
@@ -307,7 +314,7 @@ public class RoadGenVoronoi : MonoBehaviour
         }
     }
 
-    public void Triangulate(List<Vertex> pointList) {
+    public List<Triangle> Triangulate(List<Vertex> pointList) {
 
         List<Triangle> triangles = new();
 
@@ -341,22 +348,31 @@ public class RoadGenVoronoi : MonoBehaviour
                 }
             }
 
-            // Create new triangles from the edges and current point and add to list
+            /*// Create new triangles from the edges and current point and add to list
             for (int x = 0; x < edges.Count; x++) {
                 Edge ab = new(edges[x].VertexA, edges[x].VertexB);
                 Edge bc = new(edges[x].VertexB, pointList[n]);
                 Edge ca = new(pointList[n], edges[x].VertexA);
 
                 triangles.Add(new Triangle(edges[x].VertexA, edges[x].VertexB, pointList[n]));
+            }*/
+            // Create new triangles from the edges and current point and add to list
+            for (int x = 0; x < edges.Count; x++)
+            {
+                Edge currentEdge = edges[x];
+                Vertex vertexA = currentEdge.VertexA;
+                Vertex vertexB = currentEdge.VertexB;
+                Vertex vertexC = pointList[n];
+                Triangle newTriangle = new Triangle(vertexA, vertexB, vertexC);
+                triangles.Add(newTriangle);
             }
-
         }
         triangles = triangles.Where(triangle =>
         triangle.VertexA != superTriangle.VertexA && triangle.VertexA != superTriangle.VertexB && triangle.VertexA != superTriangle.VertexC &&
         triangle.VertexB != superTriangle.VertexA && triangle.VertexB != superTriangle.VertexB && triangle.VertexB != superTriangle.VertexC &&
         triangle.VertexC != superTriangle.VertexA && triangle.VertexC != superTriangle.VertexB && triangle.VertexC != superTriangle.VertexC).ToList();
 
-        triangleList = triangles;
+        return triangles;
     }
 
     private void CalculateNeighbors(List<Triangle> triangles)
@@ -382,6 +398,7 @@ public class RoadGenVoronoi : MonoBehaviour
 
     private void ComputeConvexHull(List<Vertex> points)
     {
+
         if (points.Count < 4)
         {
             throw new System.Exception("Convex hull requires at least 4 points.");
@@ -416,7 +433,7 @@ public class RoadGenVoronoi : MonoBehaviour
             currentIndex = nextIndex;
         } while (currentIndex != leftMostIndex);
 
-        triangulationConvexHull = new List<Vertex>(hull);
+        convexHull = new List<Vertex>(hull);
     }
 
     private float Orientation(Vertex a, Vertex b, Vertex c)
@@ -485,7 +502,7 @@ public class RoadGenVoronoi : MonoBehaviour
     //    return outerEdges;
     //}
 
-    static Vector3 CrossProduct(Edge edge1, Edge edge2)
+  /*  static Vector3 CrossProduct(Edge edge1, Edge edge2)
     {
         // Convert the vertices to float arrays
         float[] v1 = new float[] { edge1.VertexA.Position.x, edge1.VertexA.Position.y, edge1.VertexA.Position.z };
@@ -505,7 +522,7 @@ public class RoadGenVoronoi : MonoBehaviour
 
         // Return the cross product as a Vector3 object
         return new Vector3(cross[0], cross[1], cross[2]);
-    }
+    }*/
 
     //----------------------------------------------------------------------------------------------------------------------------------------------------------
     // Create Edge objects for the diagram by looking at each triangle and its neighbours
@@ -541,11 +558,69 @@ public class RoadGenVoronoi : MonoBehaviour
                     circumcenters.Add(triangle.Circumcenter);
                 }
             }
-            Cell cell = new(circumcenters, site.Id);
+            Cell cell = new(circumcenters, site);
             cells.Add(cell);
         }
         voronoiCells = cells;
     }
+
+/*    Vector3 CalculateCenter(List<Vertex> points)
+    {
+        Vector3 sum = Vector3.zero;
+        int count = points.Count;
+
+        foreach (Vertex point in points)
+        {
+            sum += point.Position;
+        }
+
+        if (count > 0)
+        {
+            return sum / count;
+        }
+        else
+        {
+            return Vector3.zero;
+        }
+    }*/
+    public List<Triangle> ComputeBuildingMesh(Cell cell) {
+
+        float height = Random.Range(10f, 160f);
+        // get the vertices for the bottom side of mesh
+        List<Vertex> meshBottomVertices = new();
+        // get vertices for the top side of mesh
+        List<Vertex> meshTopVertices = new();
+        foreach (Vertex v in cell.Vertices) {
+
+            meshBottomVertices.Add(v);
+            Vertex v2 = new(new(v.Position.x, v.Position.y + height, v.Position.z), 0);
+            meshTopVertices.Add(v2);
+        }
+
+        List<Vertex> completeMeshVertices = new();
+        // combine vertices
+        foreach (Vertex v in meshBottomVertices) {
+            completeMeshVertices.Add(v);
+        }
+        foreach (Vertex v in meshTopVertices)
+        {
+            completeMeshVertices.Add(v);
+        }
+
+        // triangulate complete vertices list
+        List<Triangle> completeMeshTriangles = Triangulate(completeMeshVertices);
+
+
+        // triangulate vertices
+        List<Triangle> bottomMeshTriangles = Triangulate(meshBottomVertices);
+        //List<Triangle> topMeshTriangles = Triangulate(meshTopVertices);
+
+        // combine meshes
+
+        // return triangles for mesh generation
+        return completeMeshTriangles;
+    }
+
     public void SpawnRoads(List<Edge> edges) {
 
         List<Vector3> midpoints = new();
@@ -565,7 +640,7 @@ public class RoadGenVoronoi : MonoBehaviour
             if (!duplicatePosition) {
 
                 // Calculate the rotation based on the direction of the edge
-                Vector3 direction = ((Vector3)edge.VertexB.Position - (Vector3)edge.VertexA.Position).normalized;
+                Vector3 direction = (edge.VertexB.Position - edge.VertexA.Position).normalized;
                 Quaternion rotation = Quaternion.LookRotation(direction);
 
                 // Instantiate a new road prefab
@@ -577,7 +652,7 @@ public class RoadGenVoronoi : MonoBehaviour
                 midpoints.Add(midpoint);
 
                 // Set the length
-                road.transform.localScale = new(road.transform.localScale.x * 2, road.transform.localScale.y, (road.transform.localScale.z * (float)edge.Length));
+                road.transform.localScale = new(road.transform.localScale.x * 4, road.transform.localScale.y, (road.transform.localScale.z * (float)edge.Length));
             }
         }
     }
@@ -618,24 +693,22 @@ public class RoadGenVoronoi : MonoBehaviour
     public void Pipeline(List<GameObject> pointGameObjects) {
 
         DestroyEdges();
+        DestroyMeshGenerators();
 
-        CreatePointsFromGameObjectPositions(pointGameObjects);
+        points = CreatePointsFromGameObjectPositions(pointGameObjects);
 
-        Triangulate(points);
-
-
+        triangleList = Triangulate(points);
 
         CalculateNeighbors(triangleList);
 
-
         GetVoronoiEdges(trianglesAndNeighbours);
-
-
         GetVoronoiCells(points, triangleList);
 
         CalculateUniqueTriangleVertices(triangleList);
 
-        ComputeConvexHull(uniqueTriangleVertices);
+        ComputeConvexHull(points);
+
+        DrawConvexHull(convexHull);
 
         List<Edge> triangleEdges = new();
         foreach (Triangle triangle in triangleList)
@@ -652,87 +725,42 @@ public class RoadGenVoronoi : MonoBehaviour
 
         DrawEdges(triangleEdges, Color.red);
         DrawEdges(voronoiEdgeList, Color.blue);
+//-------------------------------------------------------------------------------------------------------------------------
+        foreach (Cell c in voronoiCells) {
+            // compute mesh triangulation
+            List<Triangle> cellMeshData = ComputeBuildingMesh(c);
 
+            GameManager gameManagerScript = gameManager.GetComponent<GameManager>();
+
+            // spawn meshGenerator gameObject
+            // Vector3 spawnPos = CalculateCenter(c.Vertices);
+            GameObject meshGenerator = gameManagerScript.CreateMeshGenerator(c.Site.Position);
+            meshGenerators.Add(meshGenerator);
+            //meshGenerators.Add(meshGenerator); no need to add because they are temporary
+
+            // send cellMeshData
+            MeshGenerator meshGeneratorScript = meshGenerator.GetComponent<MeshGenerator>();
+            
+            List<Vector3> cellMeshDataVertices = new();
+            for (int i = 0; i < cellMeshData.Count; i++) {
+                cellMeshDataVertices.Add(new(cellMeshData[i].VertexA.Position.x, cellMeshData[i].VertexA.Position.y + 1, cellMeshData[i].VertexA.Position.z));
+                cellMeshDataVertices.Add(new(cellMeshData[i].VertexB.Position.x, cellMeshData[i].VertexB.Position.y + 1, cellMeshData[i].VertexB.Position.z));
+                cellMeshDataVertices.Add(new(cellMeshData[i].VertexC.Position.x, cellMeshData[i].VertexC.Position.y + 1, cellMeshData[i].VertexC.Position.z));
+            }
+
+            meshGeneratorScript.worldSpacePoints = cellMeshDataVertices.ToArray();
+        }
+//--------------------------------------------------------------------------------------------------------------------------
     }
 
-    //private void OnDrawGizmos()
-    //{
-    //    if (triangles == null)
-    //        return;
-
-    //    Gizmos.color = Color.white;
-    //    for (int i = 0; i < triangles.Count; i++)
-    //    {
-    //        Gizmos.DrawLine(triangles[i].VertexA.Position, triangles[i].VertexB.Position);
-    //        Gizmos.DrawLine(triangles[i].VertexB.Position, triangles[i].VertexC.Position);
-    //        Gizmos.DrawLine(triangles[i].VertexC.Position, triangles[i].VertexA.Position);
-    //    }
-
-    //    Gizmos.color = Color.blue;
-    //    foreach (Edge edge in voronoiEdges)
-    //    {
-    //        //Gizmos.DrawSphere(edge.VertexA.Position, 3f);
-    //        //Gizmos.DrawSphere(edge.VertexB.Position, 3f);
-    //        Gizmos.DrawLine(edge.VertexA.Position, edge.VertexB.Position);
-    //    }
-
-    //    Gizmos.color = Color.blue;
-    //    foreach (Cell cell in voronoiCells)
-    //    {
-    //        foreach (Vertex v in cell.Vertices)
-    //        {
-    //            Gizmos.DrawSphere(v.Position, 40f);
-    //        }
-    //    }
-
-    //    Vertex v1 = new Vertex(new(2000, 0, 10), 1);
-    //    Vertex v2 = new Vertex(new(1000, 0, 1500), 2);
-    //    Vertex v3 = new Vertex(new(3000, 0, 750), 3);
-    //    Vertex v4 = new Vertex(new(500, 0, 500), 4);
-    //    Vertex v5 = new Vertex(new(1000, 0, 1000), 5);
-    //    Vertex v6 = new Vertex(new(1750, 0, 200), 6);
-    //    Vertex v7 = new Vertex(new(1800, 0, 1800), 7);
-    //    Vertex v8 = new Vertex(new(2010, 0, 890), 8);
-    //    Vertex v9 = new Vertex(new(650, 0, 1730), 9);
-    //    Vertex v10 = new Vertex(new(3340, 0, 980), 10);
-    //    Vertex v11 = new Vertex(new(-1000, 0, 1520), 11);
-    //    Vertex v12 = new Vertex(new(2500, 0, 5000), 12);
-    //    Vertex v13 = new Vertex(new(-1000, 0, -2000), 13);
-    //    Vertex v14 = new Vertex(new(160, 0, 310), 14);
-    //    Vertex v15 = new Vertex(new(1690, 0, 4750), 15);
-    //    Vertex v16 = new Vertex(new(3000, 0, -2000), 16);
-    //    Vertex v17 = new Vertex(new(1200, 0, -2340), 17);
-
-    //    List<Vertex> testPoints = new();
-    //    //testPoints.Add(v1);
-    //    testPoints.Add(v2);
-    //    testPoints.Add(v3);
-    //    testPoints.Add(v4);
-    //    testPoints.Add(v5);
-    //    testPoints.Add(v6);
-    //    testPoints.Add(v7);
-    //    testPoints.Add(v8);
-    //   /* testPoints.Add(v9);
-    //    testPoints.Add(v10);
-    //    testPoints.Add(v11);
-    //    testPoints.Add(v12);
-    //    testPoints.Add(v13);
-    //    testPoints.Add(v14);
-    //    testPoints.Add(v15);
-    //    testPoints.Add(v16);
-    //    testPoints.Add(v17);*/
-
-    //    Gizmos.color = Color.red;
-    //    foreach (Vertex point in testPoints)
-    //    {
-    //        Gizmos.DrawSphere(point.Position, 30);
-    //    }
-
-    //    Gizmos.color = Color.magenta;
-    //    foreach (Vertex v in triangulationConvexHull) {
-    //        Gizmos.DrawSphere(v.Position, 40);
-    //    }
-    //}
+    public void DestroyMeshGenerators() {
+        if (meshGenerators.Count != 0) {
+            for (int i = 0; i < meshGenerators.Count; i++)
+            {
+                Destroy(meshGenerators[i]);
+            }
+        }
+    }
 
     public void DrawEdges(List<Edge> edges, Color colour)
     {
@@ -759,10 +787,26 @@ public class RoadGenVoronoi : MonoBehaviour
         }
     }
 
+    public void DrawConvexHull(List<Vertex> convexHull) {
 
-    private void Awake()
-    {
-        
+        foreach (GameObject p in pointGameObjects) {
+
+            // Reset all vertices to red
+            Material material = p.GetComponent<Renderer>().material;
+            material.color = Color.red;
+
+            // if vertex is part of convex hull, change colour to purple
+            foreach (Vertex v in convexHull)
+            {
+                if (p.transform.position == v.Position)
+                {
+                    // Get the Material component of the GameObject
+                    material = p.GetComponent<Renderer>().material;
+                    // Set the color of the Material to purple
+                    material.color = Color.magenta;
+                }
+            }
+        }
     }
 
 

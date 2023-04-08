@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class CityGenerator : MonoBehaviour
+/*public class CityGenerator : MonoBehaviour
 {
     public Transform blockPrefab;
     public GameObject gameManagerObject;
@@ -117,3 +117,4 @@ public class CityGenerator : MonoBehaviour
     }
 
 }
+*/
