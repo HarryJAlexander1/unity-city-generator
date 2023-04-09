@@ -8,8 +8,8 @@ public class RoadGenVoronoi : MonoBehaviour
 {
     public LineRenderer lineRenderer;
     public List<Vertex> points;
-    public List<Triangle> triangleList;
-    public Dictionary<Triangle, List<Triangle>> trianglesAndNeighbours;
+    public HashSet<Triangle> triangleList;
+    public Dictionary<Triangle, HashSet<Triangle>> trianglesAndNeighbours;
     public List<Edge> voronoiEdgeList;
     public List<Cell> voronoiCells;
     public List<Vertex> uniqueTriangleVertices;
@@ -86,6 +86,12 @@ public class RoadGenVoronoi : MonoBehaviour
         private Vertex _vertexB;
         private Vertex _vertexC;
 
+        private Edge _edgeAB;
+        private Edge _edgeBC;
+        private Edge _edgeCA;
+
+        private List<Edge> _edges = new();
+
         private Vertex _circumcenter;
         private float _circumradius;
 
@@ -98,12 +104,32 @@ public class RoadGenVoronoi : MonoBehaviour
             Vector2 circumcenterVector2 = GetCircumcenter(this);
             _circumcenter = new(new(circumcenterVector2.x, 0, circumcenterVector2.y), 0);
             _circumradius = Vector2.Distance(circumcenterVector2, new(VertexA.Position.x, VertexA.Position.z));
+
+            _edgeAB = new(_vertexA, _vertexB);
+            _edgeBC = new(_vertexB, _vertexC);
+            _edgeCA = new(_vertexC, _vertexA);
+
+            _edges.Add(_edgeAB);
+            _edges.Add(_edgeBC);
+            _edges.Add(_edgeCA);
         }
-        public IEnumerable<Edge> GetEdges()
+        public Edge EdgeAB {
+            get { return _edgeAB; }
+            set { _edgeAB = value; }
+        }
+        public Edge EdgeBC
         {
-            yield return new Edge(_vertexA, _vertexB);
-            yield return new Edge(_vertexB, _vertexC);
-            yield return new Edge(_vertexC, _vertexA);
+            get { return _edgeBC; }
+            set { _edgeBC = value; }
+        }
+        public Edge EdgeCA
+        {
+            get { return _edgeCA; }
+            set { _edgeCA = value; }
+        }
+
+        public List<Edge> GetEdges() {
+            return _edges;
         }
 
         // getter and setters
@@ -299,89 +325,103 @@ public class RoadGenVoronoi : MonoBehaviour
         }
     }
 
-    private bool IsPointInCircumcircle(Vertex point, Triangle triangle) {
-
+    private bool IsPointInCircumcircle(Vertex point, Triangle triangle)
+    {
         Vector3 circumcenter = triangle.Circumcenter.Position;
         float circumradius = triangle.Circumradius;
 
         float R = Mathf.Sqrt(Mathf.Pow(circumcenter.x - point.Position.x, 2) + Mathf.Pow(circumcenter.z - point.Position.z, 2));
 
-        if (R <= circumradius) {
+        //float epsilon = 1e-12f; // You can adjust this value based on the level of precision you need
+
+        if (R < circumradius)
+        {
             return true;
         }
-        else {
+        else
+        {
             return false;
         }
     }
 
-    public List<Triangle> Triangulate(List<Vertex> pointList) {
-
-        List<Triangle> triangles = new();
+    public HashSet<Triangle> Triangulate(List<Vertex> pointList)
+    {
+        HashSet<Triangle> triangles = new();
 
         Triangle superTriangle = InitialiseSuperTriangle(pointList);
 
         triangles.Add(superTriangle);
 
-        for (int n = 0; n < pointList.Count; n++) {
-            List<Edge> edges = new List<Edge>();
+        for (int n = 0; n < pointList.Count; n++)
+        {
+            HashSet<Triangle> badTriangles = new();
 
-            for (int i = triangles.Count - 1; i >= 0; i--) {
+            for (int i = 0; i < triangles.Count; i++)
+            {
                 // if point is inside triangle circumcircle
-                if (IsPointInCircumcircle(pointList[n], triangles[i])) {
-                    // add triangle's edges to edges
-                    edges.Add(new Edge(triangles[i].VertexA, triangles[i].VertexB));
-                    edges.Add(new Edge(triangles[i].VertexB, triangles[i].VertexC));
-                    edges.Add(new Edge(triangles[i].VertexC, triangles[i].VertexA));
-                    // remove current triangle from list
-                    triangles.RemoveAt(i);
+                if (IsPointInCircumcircle(pointList[n], triangles.ToList()[i]))
+                {
+                    badTriangles.Add(triangles.ToList()[i]);
                 }
             }
+            List<Edge> polygon = new();
+            // iterate through all bad triangles
+            for (int i = 0; i < badTriangles.Count; i++)
+            {
+                // iterate through edges
+                foreach (Edge edge in badTriangles.ToList()[i].GetEdges())
+                {
+                    // set invalidEdge to false
+                    bool invalidEdge = false;
+                    // look at all other triangles in list
+                    for (int j = 0; j < badTriangles.Count; j++)
+                    {
+                        if (i == j) { continue; }
+                        // get all the edges of all other triangles
+                        foreach (Edge edge1 in badTriangles.ToList()[j].GetEdges())
+                        {
+                            //compare the vertices of both edges
+                            if (edge.VertexA == edge1.VertexA && edge.VertexB == edge1.VertexB || edge.VertexA == edge1.VertexB && edge1.VertexA == edge.VertexB)
+                            {
+                                // if both vertex A and B are the same, set invalidEdge to true
+                                invalidEdge = true;
+                            }
+                        }
+                    }
 
-            // Remove any duplicate edges from the list
-            for (int j = 0; j < edges.Count; j++) {
-                for (int k = j + 1; k < edges.Count; k++) {
-                    if (edges[j].VertexA == edges[k].VertexB && edges[j].VertexB == edges[k].VertexA) {
-                        edges.RemoveAt(k);
-                        edges.RemoveAt(j);
-                        break;
+                    if (!invalidEdge)
+                    {
+                        polygon.Add(edge);
+                        //Debug.Log("This edge has been added to the polygon");
                     }
                 }
             }
-
-            /*// Create new triangles from the edges and current point and add to list
-            for (int x = 0; x < edges.Count; x++) {
-                Edge ab = new(edges[x].VertexA, edges[x].VertexB);
-                Edge bc = new(edges[x].VertexB, pointList[n]);
-                Edge ca = new(pointList[n], edges[x].VertexA);
-
-                triangles.Add(new Triangle(edges[x].VertexA, edges[x].VertexB, pointList[n]));
-            }*/
-            // Create new triangles from the edges and current point and add to list
-            for (int x = 0; x < edges.Count; x++)
+            foreach (Triangle triangle in badTriangles)
             {
-                Edge currentEdge = edges[x];
-                Vertex vertexA = currentEdge.VertexA;
-                Vertex vertexB = currentEdge.VertexB;
-                Vertex vertexC = pointList[n];
-                Triangle newTriangle = new Triangle(vertexA, vertexB, vertexC);
+                triangles.Remove(triangle);
+            }
+            foreach (Edge edge in polygon)
+            {
+                Triangle newTriangle = new(edge.VertexA, edge.VertexB, pointList[n]);
                 triangles.Add(newTriangle);
             }
         }
+        // remove triangles whose edge is connected to the supertriangle
         triangles = triangles.Where(triangle =>
         triangle.VertexA != superTriangle.VertexA && triangle.VertexA != superTriangle.VertexB && triangle.VertexA != superTriangle.VertexC &&
         triangle.VertexB != superTriangle.VertexA && triangle.VertexB != superTriangle.VertexB && triangle.VertexB != superTriangle.VertexC &&
-        triangle.VertexC != superTriangle.VertexA && triangle.VertexC != superTriangle.VertexB && triangle.VertexC != superTriangle.VertexC).ToList();
+        triangle.VertexC != superTriangle.VertexA && triangle.VertexC != superTriangle.VertexB && triangle.VertexC != superTriangle.VertexC).ToHashSet<Triangle>();
 
         return triangles;
     }
 
-    private void CalculateNeighbors(List<Triangle> triangles)
+    private void CalculateNeighbors(HashSet<Triangle> triangles)
     {
-        Dictionary<Triangle, List<Triangle>> neighbors = new Dictionary<Triangle, List<Triangle>>();
+        Dictionary<Triangle, HashSet<Triangle>> neighbors = new Dictionary<Triangle, HashSet<Triangle>>();
 
         foreach (Triangle t in triangles)
         {
-            neighbors[t] = new List<Triangle>();
+            neighbors[t] = new HashSet<Triangle>();
         }
         foreach (Triangle t in triangles)
         {
@@ -441,7 +481,7 @@ public class RoadGenVoronoi : MonoBehaviour
         return (b.Position.x - a.Position.x) * (c.Position.z - a.Position.z) - (b.Position.z - a.Position.z) * (c.Position.x - a.Position.x);
     }
     // DOES NOT WORK!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    //private List<Edge> CalculateOuterEdges(List<Triangle> trianglulation, int maxLength) {
+    //private List<Edge> CalculateOuterEdges(HashSet<Triangle> trianglulation, int maxLength) {
     //    List<Edge> outerEdges = new();
     //    List<Vertex> triangleVertices = new();
     //    foreach (Triangle t in trianglulation)
@@ -526,11 +566,11 @@ public class RoadGenVoronoi : MonoBehaviour
 
     //----------------------------------------------------------------------------------------------------------------------------------------------------------
     // Create Edge objects for the diagram by looking at each triangle and its neighbours
-    private void GetVoronoiEdges(Dictionary<Triangle, List<Triangle>> trianglesAndNeighbours)
+    private void GetVoronoiEdges(Dictionary<Triangle, HashSet<Triangle>> trianglesAndNeighbours)
     {
         List<Edge> voronoiEdges = new();
 
-        foreach (KeyValuePair<Triangle, List<Triangle>> entry in trianglesAndNeighbours)
+        foreach (KeyValuePair<Triangle, HashSet<Triangle>> entry in trianglesAndNeighbours)
         {
             // iterate through the list of strings associated to the key
             foreach (Triangle value in entry.Value)
@@ -544,7 +584,7 @@ public class RoadGenVoronoi : MonoBehaviour
     }
 
     // Creates Cell objects from the cells in the voronoi diagram by looking at the original sites and triangulation
-    private void GetVoronoiCells(List<Vertex> sites, List<Triangle> triangles)
+    private void GetVoronoiCells(List<Vertex> sites, HashSet<Triangle> triangles)
     {
         List<Cell> cells = new();
 
@@ -564,26 +604,7 @@ public class RoadGenVoronoi : MonoBehaviour
         voronoiCells = cells;
     }
 
-/*    Vector3 CalculateCenter(List<Vertex> points)
-    {
-        Vector3 sum = Vector3.zero;
-        int count = points.Count;
-
-        foreach (Vertex point in points)
-        {
-            sum += point.Position;
-        }
-
-        if (count > 0)
-        {
-            return sum / count;
-        }
-        else
-        {
-            return Vector3.zero;
-        }
-    }*/
-    public List<Triangle> ComputeBuildingMesh(Cell cell) {
+    public HashSet<Triangle> ComputeBuildingMesh(Cell cell) {
 
         float height = Random.Range(10f, 160f);
         // get the vertices for the bottom side of mesh
@@ -608,12 +629,12 @@ public class RoadGenVoronoi : MonoBehaviour
         }
 
         // triangulate complete vertices list
-        List<Triangle> completeMeshTriangles = Triangulate(completeMeshVertices);
+        HashSet<Triangle> completeMeshTriangles = Triangulate(completeMeshVertices);
 
 
         // triangulate vertices
-        List<Triangle> bottomMeshTriangles = Triangulate(meshBottomVertices);
-        //List<Triangle> topMeshTriangles = Triangulate(meshTopVertices);
+        HashSet<Triangle> bottomMeshTriangles = Triangulate(meshBottomVertices);
+        //HashSet<Triangle> topMeshTriangles = Triangulate(meshTopVertices);
 
         // combine meshes
 
@@ -657,7 +678,7 @@ public class RoadGenVoronoi : MonoBehaviour
         }
     }
 
-    public void CalculateUniqueTriangleVertices(List<Triangle> triangles) {
+    public void CalculateUniqueTriangleVertices(HashSet<Triangle> triangles) {
 
         List<Vertex> triangleVertices = new();
         foreach (Triangle t in triangles)
@@ -714,21 +735,20 @@ public class RoadGenVoronoi : MonoBehaviour
         foreach (Triangle triangle in triangleList)
         {
             // get edges
-            Edge edge1 = new Edge(triangle.VertexA, triangle.VertexB);
-            Edge edge2 = new Edge(triangle.VertexB, triangle.VertexC);
-            Edge edge3 = new Edge(triangle.VertexC, triangle.VertexA);
+            
 
-            triangleEdges.Add(edge1);
-            triangleEdges.Add(edge2);
-            triangleEdges.Add(edge3);
+            triangleEdges.Add(triangle.EdgeAB);
+            triangleEdges.Add(triangle.EdgeBC);
+            triangleEdges.Add(triangle.EdgeCA);
         }
 
         DrawEdges(triangleEdges, Color.red);
         DrawEdges(voronoiEdgeList, Color.blue);
-//-------------------------------------------------------------------------------------------------------------------------
-        foreach (Cell c in voronoiCells) {
+        //-------------------------------------------------------------------------------------------------------------------------
+        foreach (Cell c in voronoiCells)
+        {
             // compute mesh triangulation
-            List<Triangle> cellMeshData = ComputeBuildingMesh(c);
+            HashSet<Triangle> cellMeshData = ComputeBuildingMesh(c);
 
             GameManager gameManagerScript = gameManager.GetComponent<GameManager>();
 
@@ -740,17 +760,18 @@ public class RoadGenVoronoi : MonoBehaviour
 
             // send cellMeshData
             MeshGenerator meshGeneratorScript = meshGenerator.GetComponent<MeshGenerator>();
-            
+
             List<Vector3> cellMeshDataVertices = new();
-            for (int i = 0; i < cellMeshData.Count; i++) {
-                cellMeshDataVertices.Add(new(cellMeshData[i].VertexA.Position.x, cellMeshData[i].VertexA.Position.y + 1, cellMeshData[i].VertexA.Position.z));
-                cellMeshDataVertices.Add(new(cellMeshData[i].VertexB.Position.x, cellMeshData[i].VertexB.Position.y + 1, cellMeshData[i].VertexB.Position.z));
-                cellMeshDataVertices.Add(new(cellMeshData[i].VertexC.Position.x, cellMeshData[i].VertexC.Position.y + 1, cellMeshData[i].VertexC.Position.z));
+            for (int i = 0; i < cellMeshData.Count; i++)
+            {
+                cellMeshDataVertices.Add(new(cellMeshData.ToList()[i].VertexA.Position.x, cellMeshData.ToList()[i].VertexA.Position.y + 1, cellMeshData.ToList()[i].VertexA.Position.z));
+                cellMeshDataVertices.Add(new(cellMeshData.ToList()[i].VertexB.Position.x, cellMeshData.ToList()[i].VertexB.Position.y + 1, cellMeshData.ToList()[i].VertexB.Position.z));
+                cellMeshDataVertices.Add(new(cellMeshData.ToList()[i].VertexC.Position.x, cellMeshData.ToList()[i].VertexC.Position.y + 1, cellMeshData.ToList()[i].VertexC.Position.z));
             }
 
             meshGeneratorScript.worldSpacePoints = cellMeshDataVertices.ToArray();
         }
-//--------------------------------------------------------------------------------------------------------------------------
+        //--------------------------------------------------------------------------------------------------------------------------
     }
 
     public void DestroyMeshGenerators() {
@@ -806,6 +827,50 @@ public class RoadGenVoronoi : MonoBehaviour
                     material.color = Color.magenta;
                 }
             }
+        }
+    }
+
+    private void OnDrawGizmos()
+    {
+        if (triangleList != null)
+        {
+            for (int i=0; i< triangleList.Count; i++)
+            {
+                Vector3 circumcenter = triangleList.ToList()[i].Circumcenter.Position;
+                float circumradius = triangleList.ToList()[i].Circumradius;
+
+                // Set the Gizmo color
+                Gizmos.color = Color.yellow;
+
+                // Draw the circumcircle
+                DrawCircleGizmo(circumcenter, circumradius);
+                Gizmos.DrawSphere(circumcenter, 1f);
+                Gizmos.DrawLine(triangleList.ToList()[i].VertexA.Position, triangleList.ToList()[i].VertexB.Position);
+                Gizmos.DrawLine(triangleList.ToList()[i].VertexB.Position, triangleList.ToList()[i].VertexC.Position);
+                Gizmos.DrawLine(triangleList.ToList()[i].VertexC.Position, triangleList.ToList()[i].VertexA.Position);
+            }
+        }
+    }
+
+    private void DrawCircleGizmo(Vector3 center, float radius)
+    {
+        int numSegments = 128;
+        float angleStep = 360f / numSegments;
+
+        Vector3 prevPoint = center + new Vector3(radius, 0, 0);
+        for (int i = 1; i <= numSegments; i++)
+        {
+            float angle = i * angleStep;
+            float radAngle = Mathf.Deg2Rad * angle;
+
+            Vector3 newPoint = new Vector3(
+                center.x + radius * Mathf.Cos(radAngle),
+                center.y,
+                center.z + radius * Mathf.Sin(radAngle)
+            );
+
+            Gizmos.DrawLine(prevPoint, newPoint);
+            prevPoint = newPoint;
         }
     }
 
