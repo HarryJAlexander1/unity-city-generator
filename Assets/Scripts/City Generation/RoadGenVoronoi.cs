@@ -6,7 +6,6 @@ using UnityEngine;
 
 public class RoadGenVoronoi : MonoBehaviour
 {
-    public LineRenderer lineRenderer;
     public List<Vertex> points;
     public HashSet<Triangle> triangleList;
     public Dictionary<Triangle, HashSet<Triangle>> trianglesAndNeighbours;
@@ -388,7 +387,6 @@ public class RoadGenVoronoi : MonoBehaviour
                             }
                         }
                     }
-
                     if (!invalidEdge)
                     {
                         polygon.Add(edge);
@@ -480,91 +478,7 @@ public class RoadGenVoronoi : MonoBehaviour
     {
         return (b.Position.x - a.Position.x) * (c.Position.z - a.Position.z) - (b.Position.z - a.Position.z) * (c.Position.x - a.Position.x);
     }
-    // DOES NOT WORK!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    //private List<Edge> CalculateOuterEdges(HashSet<Triangle> trianglulation, int maxLength) {
-    //    List<Edge> outerEdges = new();
-    //    List<Vertex> triangleVertices = new();
-    //    foreach (Triangle t in trianglulation)
-    //    {
-    //        triangleVertices.Add(t.VertexA);
-    //        triangleVertices.Add(t.VertexB);
-    //        triangleVertices.Add(t.VertexC);
-    //    }
-    //    HashSet<Vector3> uniquePositions = new HashSet<Vector3>();
-    //    List<Vertex> uniqueVertices = new List<Vertex>();
-
-    //    foreach (Vertex vertex in triangleVertices)
-    //    {
-    //        if (uniquePositions.Add(vertex.Position))
-    //        {
-    //            uniqueVertices.Add(vertex);
-    //        }
-    //    }
-
-    //    // Now uniqueVertices contains only the unique vertices based on their positions
-    //    Debug.Log("Unique vertices count: " + uniqueVertices.Count);
-
-    //    triangulationConvexHull = ComputeConvexHull(uniqueVertices);
-
-    //    HashSet<Edge> visitedEdges = new HashSet<Edge>(); // To avoid processing the same edge twice
-    //    // iterate through each triangle in triangulation
-    //    foreach (Triangle t in trianglulation) {
-    //        // get edges of each triangle
-    //        foreach (Edge e in t.GetEdges()) {
-    //            // if edge hasnt been processed and convexhull contains vertices A and B of edge 
-    //            if (!visitedEdges.Contains(e) && triangulationConvexHull.Contains(e.VertexA) && triangulationConvexHull.Contains(e.VertexB)) {
-
-    //                // get circumcenter of triangle
-    //                Vertex startPoint = t.Circumcenter;
-    //                // get edges of the triangle
-    //                List<Edge> triangleEdges = new();
-    //                foreach (Edge edge in t.GetEdges()) {
-    //                    triangleEdges.Add(edge);
-    //                }
-    //                Vector3 crossProduct = CrossProduct(triangleEdges[0], triangleEdges[1]);
-
-    //                // Normalize the cross product
-    //                Vector3 normal = crossProduct.normalized;
-    //                int length = 3000;
-    //                Vector3Int normalTimesLength = new((int)normal.x * length, (int)normal.y * length, (int)normal.z * length);
-    //                Vector3Int endpointPosition = startPoint.Position + normalTimesLength;
-
-    //                // Create an edge between the Voronoi vertex and the endpoint
-    //                // You can use the endpoint and the Voronoi vertex to create a line segment or an edge in Unity or other game engines
-    //                Vertex endpoint = new(endpointPosition, 1);
-
-    //                Edge outerEdge = new(startPoint, endpoint); 
-    //                outerEdges.Add(outerEdge);
-    //            }
-    //            visitedEdges.Add(e);
-    //        }
-    //    }
-    //    return outerEdges;
-    //}
-
-  /*  static Vector3 CrossProduct(Edge edge1, Edge edge2)
-    {
-        // Convert the vertices to float arrays
-        float[] v1 = new float[] { edge1.VertexA.Position.x, edge1.VertexA.Position.y, edge1.VertexA.Position.z };
-        float[] v2 = new float[] { edge1.VertexB.Position.x, edge1.VertexB.Position.y, edge1.VertexB.Position.z };
-        float[] v3 = new float[] { edge2.VertexB.Position.x, edge2.VertexB.Position.y, edge2.VertexB.Position.z };
-
-        // Calculate the edge vectors
-        float[] e1 = new float[] { v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2] };
-        float[] e2 = new float[] { v3[0] - v1[0], v3[1] - v1[1], v3[2] - v1[2] };
-
-        // Calculate the cross product of the edge vectors
-        float[] cross = new float[] {
-            e1[1] * e2[2] - e1[2] * e2[1],
-            e1[2] * e2[0] - e1[0] * e2[2],
-            e1[0] * e2[1] - e1[1] * e2[0]
-        };
-
-        // Return the cross product as a Vector3 object
-        return new Vector3(cross[0], cross[1], cross[2]);
-    }*/
-
-    //----------------------------------------------------------------------------------------------------------------------------------------------------------
+    
     // Create Edge objects for the diagram by looking at each triangle and its neighbours
     private void GetVoronoiEdges(Dictionary<Triangle, HashSet<Triangle>> trianglesAndNeighbours)
     {
@@ -604,45 +518,52 @@ public class RoadGenVoronoi : MonoBehaviour
         voronoiCells = cells;
     }
 
-    public HashSet<Triangle> ComputeBuildingMesh(Cell cell) {
+    public List<List<Vertex>> ComputeBuildingMeshFaceVertices(Cell cell) {
 
-        float height = Random.Range(10f, 160f);
-        // get the vertices for the bottom side of mesh
+        // assign height variable to determine height of building
+        float height = Random.Range(120f, 460f);
+        // Initialise bottom face vertices
         List<Vertex> meshBottomVertices = new();
-        // get vertices for the top side of mesh
+        // Initialise top face vertices
         List<Vertex> meshTopVertices = new();
+        // Add vertices to both lists based on the vertices that make up the cell.
         foreach (Vertex v in cell.Vertices) {
-
             meshBottomVertices.Add(v);
             Vertex v2 = new(new(v.Position.x, v.Position.y + height, v.Position.z), 0);
             meshTopVertices.Add(v2);
         }
 
-        List<Vertex> completeMeshVertices = new();
-        // combine vertices
-        foreach (Vertex v in meshBottomVertices) {
-            completeMeshVertices.Add(v);
-        }
-        foreach (Vertex v in meshTopVertices)
-        {
-            completeMeshVertices.Add(v);
-        }
+        List<List<Vertex>> bothFaceVertices = new();
+        bothFaceVertices.Add(meshBottomVertices);
+        bothFaceVertices.Add(meshTopVertices);
 
-        // triangulate complete vertices list
-        HashSet<Triangle> completeMeshTriangles = Triangulate(completeMeshVertices);
-
-
-        // triangulate vertices
-        HashSet<Triangle> bottomMeshTriangles = Triangulate(meshBottomVertices);
-        //HashSet<Triangle> topMeshTriangles = Triangulate(meshTopVertices);
-
-        // combine meshes
-
-        // return triangles for mesh generation
-        return completeMeshTriangles;
+        return bothFaceVertices;
     }
 
+    public List<Vertex> ComputeBuildingMeshFaceTriangles(List<List<Vertex>> meshFaceVertices) {
+
+        // triangulate vertices of both sides
+        HashSet<Triangle> meshBottomTriangles = Triangulate(meshFaceVertices[0]);
+        HashSet<Triangle> meshTopTriangles = Triangulate(meshFaceVertices[1]);
+        // get vertices from triangulation
+        List<Vertex> meshBaseVertices = new();
+        foreach (Triangle triangle in meshBottomTriangles)
+        {
+            meshBaseVertices.Add(triangle.VertexA);
+            meshBaseVertices.Add(triangle.VertexB);
+            meshBaseVertices.Add(triangle.VertexC);
+        }
+        foreach (Triangle triangle in meshTopTriangles)
+        {
+            meshBaseVertices.Add(triangle.VertexA);
+            meshBaseVertices.Add(triangle.VertexB);
+            meshBaseVertices.Add(triangle.VertexC);
+        }
+        // return triangles for mesh generation
+        return meshBaseVertices;
+    }
     public void SpawnRoads(List<Edge> edges) {
+
 
         List<Vector3> midpoints = new();
         bool duplicatePosition;
@@ -745,35 +666,49 @@ public class RoadGenVoronoi : MonoBehaviour
         DrawEdges(triangleEdges, Color.red);
         DrawEdges(voronoiEdgeList, Color.blue);
         //-------------------------------------------------------------------------------------------------------------------------
-        foreach (Cell c in voronoiCells)
-        {
-            // compute mesh triangulation
-            HashSet<Triangle> cellMeshData = ComputeBuildingMesh(c);
-
-            GameManager gameManagerScript = gameManager.GetComponent<GameManager>();
-
-            // spawn meshGenerator gameObject
-            // Vector3 spawnPos = CalculateCenter(c.Vertices);
-            GameObject meshGenerator = gameManagerScript.CreateMeshGenerator(c.Site.Position);
-            meshGenerators.Add(meshGenerator);
-            //meshGenerators.Add(meshGenerator); no need to add because they are temporary
-
-            // send cellMeshData
-            MeshGenerator meshGeneratorScript = meshGenerator.GetComponent<MeshGenerator>();
-
-            List<Vector3> cellMeshDataVertices = new();
-            for (int i = 0; i < cellMeshData.Count; i++)
-            {
-                cellMeshDataVertices.Add(new(cellMeshData.ToList()[i].VertexA.Position.x, cellMeshData.ToList()[i].VertexA.Position.y + 1, cellMeshData.ToList()[i].VertexA.Position.z));
-                cellMeshDataVertices.Add(new(cellMeshData.ToList()[i].VertexB.Position.x, cellMeshData.ToList()[i].VertexB.Position.y + 1, cellMeshData.ToList()[i].VertexB.Position.z));
-                cellMeshDataVertices.Add(new(cellMeshData.ToList()[i].VertexC.Position.x, cellMeshData.ToList()[i].VertexC.Position.y + 1, cellMeshData.ToList()[i].VertexC.Position.z));
-            }
-
-            meshGeneratorScript.worldSpacePoints = cellMeshDataVertices.ToArray();
-        }
+        CreateMeshGenerators();
         //--------------------------------------------------------------------------------------------------------------------------
     }
 
+    public void CreateMeshGenerators() {
+        foreach (Cell c in voronoiCells)
+        {
+            // compute the convex hull for both the top and bottom faces
+            List<List<Vertex>> meshFaceVertices = ComputeBuildingMeshFaceVertices(c);
+
+            // compute triangle vertices for top and bottom face triangulations
+            List<Vertex> meshFaceTriangles = ComputeBuildingMeshFaceTriangles(meshFaceVertices);
+
+
+            GameManager gameManagerScript = gameManager.GetComponent<GameManager>();
+            // spawn meshGenerator gameObject
+            GameObject meshGenerator = gameManagerScript.CreateMeshGenerator(c.Site.Position);
+            meshGenerators.Add(meshGenerator);
+            MeshGenerator meshGeneratorScript = meshGenerator.GetComponent<MeshGenerator>();
+
+
+            List<Vector3> meshFaceTriangleVerticesPositions = new();
+            foreach (Vertex v in meshFaceTriangles)
+            {
+                meshFaceTriangleVerticesPositions.Add(v.Position);
+            }
+
+            List<Vector3> bottomMeshVerticesPositions = new();
+            foreach (Vertex v in meshFaceVertices[0])
+            {
+                bottomMeshVerticesPositions.Add(v.Position);
+            }
+            List<Vector3> topMeshVerticesPositions = new();
+            foreach (Vertex v in meshFaceVertices[1])
+            {
+                topMeshVerticesPositions.Add(v.Position);
+            }
+
+            meshGeneratorScript.meshFaceTriangleVertices = meshFaceTriangleVerticesPositions;
+            meshGeneratorScript.bottomMeshVertices = bottomMeshVerticesPositions;
+            meshGeneratorScript.topMeshVertices = topMeshVerticesPositions;
+        }
+    }
     public void DestroyMeshGenerators() {
         if (meshGenerators.Count != 0) {
             for (int i = 0; i < meshGenerators.Count; i++)
@@ -874,69 +809,4 @@ public class RoadGenVoronoi : MonoBehaviour
         }
     }
 
-
-    //private void Awake()
-    //{
-    //    Vertex v1 = new Vertex(new(2000, 0, 10), 1);
-    //    Vertex v2 = new Vertex(new(1000, 0, 1500), 2);
-    //    Vertex v3 = new Vertex(new(3000, 0, 750), 3);
-    //    Vertex v4 = new Vertex(new(500, 0, 500), 4);
-    //    Vertex v5 = new Vertex(new(1000, 0, 1000), 5);
-    //    Vertex v6 = new Vertex(new(1750, 0, 200), 6);
-    //    Vertex v7 = new Vertex(new(1800, 0, 1800), 7);
-    //    Vertex v8 = new Vertex(new(2010, 0, 890), 8);
-    //    Vertex v9 = new Vertex(new(650, 0, 1730), 9);
-    //    Vertex v10 = new Vertex(new(3340, 0, 980), 10);
-    //    Vertex v11 = new Vertex(new(-1000, 0, 1520), 11);
-    //    Vertex v12 = new Vertex(new(2500, 0, 5000), 12);
-    //    Vertex v13 = new Vertex(new(-1000, 0, -2000), 13);
-    //    Vertex v14 = new Vertex(new(160, 0, 310), 14);
-    //    Vertex v15 = new Vertex(new(1690, 0, 4750), 15);
-    //    Vertex v16 = new Vertex(new(3000, 0, -2000), 16);
-    //    Vertex v17 = new Vertex(new(1200, 0, -2340), 17);
-    //    points = new();
-    //    //points.Add(v1);
-    //    points.Add(v2);
-    //    points.Add(v3);
-    //    points.Add(v4);
-    //    points.Add(v5);
-    //    points.Add(v6);
-    //    points.Add(v7);
-    //    points.Add(v8);
-    //    /*points.Add(v9);
-    //    points.Add(v10);
-    //    points.Add(v11);
-    //    points.Add(v12);
-    //    points.Add(v13);
-    //    points.Add(v14);
-    //    points.Add(v15);
-    //    points.Add(v16);
-    //    points.Add(v17);*/
-
-    //    triangles = Triangulate(points);
-    //    trianglesAndNeighbours = CalculateNeighbors(triangles);
-    //    voronoiEdges = GetVoronoiEdges(trianglesAndNeighbours);
-    //    SpawnRoads(voronoiEdges);
-    //    voronoiCells = GetVoronoiCells(points, triangles);
-
-    //    List<Vertex> triangleVertices = new();
-    //    foreach (Triangle t in triangles)
-    //    {
-    //        triangleVertices.Add(t.VertexA);
-    //        triangleVertices.Add(t.VertexB);
-    //        triangleVertices.Add(t.VertexC);
-    //    }
-    //    HashSet<Vector3> uniquePositions = new HashSet<Vector3>();
-    //    List<Vertex> uniqueVertices = new List<Vertex>();
-
-    //    foreach (Vertex vertex in triangleVertices)
-    //    {
-    //        if (uniquePositions.Add(vertex.Position))
-    //        {
-    //            uniqueVertices.Add(vertex);
-    //        }
-    //    }
-    //    triangulationConvexHull = ComputeConvexHull(uniqueVertices);
-
-    //}
 }

@@ -31,8 +31,5 @@ public class CityList : MonoBehaviour
         // Display the list of city names in the TextMeshPro object
         cityListText.text = string.Join("\n", cityNames.ToArray());
 
-        /*// Resize the scroll rect content to fit the text
-        LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)cityListText.transform);
-        scrollRect.content.sizeDelta = new Vector2(scrollRect.content.sizeDelta.x, ((RectTransform)cityListText.transform).rect.height);*/
     }
 }
