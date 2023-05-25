@@ -15,4 +15,5 @@ This Unity project explores the application of L-systems and Voronoi diagrams in
 ![City made with Voronoi diagrams](images/voronoi_city.PNG)
 
 ![City made with Voronoi diagrams 2](images/voronoi-city-bricks.PNG)
-![Delaunay triangulation and subsequent Voronoi diagram](images/voronoi_delaunay.png)
+
+![Delaunay triangulation and subsequent Voronoi diagram](images/unity_voronoi.PNG)
